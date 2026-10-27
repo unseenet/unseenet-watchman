@@ -7,6 +7,10 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
+- **The language from the core** (#13, unseenet#686): `words`, `language`, `detect` and
+  the small words now come from `unseenet.core.language`, the same code the clients use to
+  suggest a post's language; the watchman's own copy is gone. Same results on the 2400
+  Usenet posts.
 - **Lingua for the language** (#12): when a post's small words cannot tell its language,
   Lingua (offline, as Emkay uses) is asked, if installed (`[lingua]` extra), and taken
   when at least 80 % sure. On 1999 Usenet posts: 89 % right instead of 78 %.

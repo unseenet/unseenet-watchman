@@ -125,7 +125,8 @@ def test_detect_asks_lingua_only_when_the_small_words_cannot_tell(monkeypatch):
     def fake(ws):
         asked.append(ws)
         return "sv"
-    monkeypatch.setattr(labels, "lingua_language", fake)
+    import unseenet.core.language as core_language
+    monkeypatch.setattr(core_language, "lingua_language", fake)
     assert labels.detect(labels.words("Jeg har lidt travlt, måske noget vi kan tage senere")) == "da"
     assert asked == []                                        # the small words were sure
     assert labels.detect(labels.words("hej hej")) == "sv"     # they were not: Lingua
