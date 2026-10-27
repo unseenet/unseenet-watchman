@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "unseenet-watchman"
+dynamic = ["version"]
+description = "Reads Unseenet's open groups and publishes spam reports (UN-RFC 0045) that readers and nodes may choose to follow"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Andreas Lorensen" }]
+requires-python = ">=3.11"
+dependencies = [
+    # Spam reports (UN-RFC 0045) arrive with core 0.6.0; until it is released, main.
+    # Then: "unseenet>=0.6,<0.7" - one minor version of the core at a time.
+    "unseenet @ git+https://github.com/unseenet/unseenet@main",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23"]
+
+[project.scripts]
+unseenet-watchman = "unseenet_watchman.runner:main"
+
+[project.urls]
+Homepage = "https://github.com/unseenet/unseenet-watchman"
+
+[tool.setuptools.dynamic]
+version = { attr = "unseenet_watchman.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+asyncio_mode = "auto"

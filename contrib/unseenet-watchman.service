@@ -1,0 +1,21 @@
+# systemd unit for the watchman, as a user "watchman" with its venv in its home.
+# The passphrase file holds UNSEENET_VAULT_PASSPHRASE=... and is readable by it alone.
+[Unit]
+Description=Unseenet watchman (automatic spam reports)
+After=network-online.target tor.service
+Wants=network-online.target
+
+[Service]
+User=watchman
+WorkingDirectory=/home/watchman
+EnvironmentFile=/home/watchman/.config/unseenet-watchman/passphrase
+ExecStart=/home/watchman/venv/bin/unseenet-watchman -c /home/watchman/watchman.toml run
+Restart=on-failure
+RestartSec=60
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/home/watchman
+
+[Install]
+WantedBy=multi-user.target

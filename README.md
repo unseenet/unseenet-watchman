@@ -1,0 +1,157 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/unseenet/unseenet/main/assets/logo-dark.svg">
+    <img src="https://raw.githubusercontent.com/unseenet/unseenet/main/assets/logo-light.svg" alt="Unseenet" width="360">
+  </picture>
+</p>
+
+<h1 align="center">unseenet-watchman</h1>
+
+<p align="center"><b>Reads the open groups and calls out what looks like spam.</b><br>
+Signed spam reports that readers, group owners and node operators may choose to follow - nobody has to.</p>
+
+<p align="center">
+  <a href="https://github.com/unseenet/unseenet-watchman/releases"><img src="https://img.shields.io/github/v/release/unseenet/unseenet-watchman?include_prereleases&label=release" alt="Release"></a>
+  <a href="https://github.com/unseenet/unseenet-watchman/actions/workflows/tests.yml"><img src="https://github.com/unseenet/unseenet-watchman/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="Apache-2.0"></a>
+</p>
+
+> **Pre-alpha.** Nothing is stable yet, and Unseenet has not had a security
+> review. Do not rely on it to protect anyone yet.
+
+## What it is
+
+Like the night watchmen of old towns, it walks the streets and calls out
+what it sees - it does not arrest anyone. The watchman is an **automatic
+issuer** of [UN-RFC 0045](https://unseenet.org/spec/un-rfc-0045/) spam
+reports: it reads the open groups of [Unseenet](https://unseenet.org),
+checks each new post, and publishes what looks like spam in its own
+`reports@` channel, marked `automatic: true` (section 8). In the tradition of
+the NoCeM notices of old Usenet.
+
+**Status:** early. It finds links to domains on URI blocklists and the same
+text posted from many keys or in many groups, and runs as a dry run until its
+operator turns publishing on.
+
+### Who watches the watchman?
+
+You do. A report does nothing by itself (UN-RFC 0045 section 5):
+
+- **You choose** whether to follow it, and can stop at once. A hierarchy or a
+  group's owner may name it as a default for their groups; you can turn that off.
+- **Nothing is removed.** Clients show a hidden post as hidden, with the
+  issuer and the reason, one click from being shown. Posts from your contacts
+  and your own are never hidden.
+- **Node operators** follow it only if they write it into their config.
+- **It cannot make anything cheaper or more trusted**, so following it gives
+  it no power over anyone who doesn't.
+
+### Two lists, one per kind
+
+It keeps **one issuer key per kind of finding**, each with its own `reports@`
+channel, so you can follow exactly what you want:
+
+| Issuer | Reports | From |
+|---|---|---|
+| *Unseenet watchman (spam)* | `spam`, `flood` | the same text from many keys, the same text from one key in many groups, links on spam blocklists |
+| *Unseenet watchman (phishing)* | `phishing`, `malware` | links on phishing and malware blocklists |
+
+### Rules it follows
+
+- **Posts first, keys later.** A key is reported only after repeated findings
+  (3 in 7 days by default), and then for 30 days - never the 365 the RFC allows.
+- **A reason with every report.** The note says why: "2 × links on
+  dbl.spamhaus.org; the same text from 7 keys".
+- **Only open groups.** Closed groups and private posts are ciphertext to it,
+  and a sealed private post is never reported. Feeds are read, because others
+  comment there.
+- **Nothing from before its first look.** It leaves earlier posts alone.
+- **Every lookup through Tor.** Blocklists are DNS zones; the watchman asks
+  them through Tor's SOCKS port, so neither the lists nor a resolver learn
+  where it runs.
+- **Mistakes are taken back.** `unreport` withdraws the report that named a
+  post or key, publishes the rest of it again, and never reports it again.
+
+## Run it
+
+```sh
+pip install "unseenet-watchman @ git+https://github.com/unseenet/unseenet-watchman.git"
+cp watchman.example.toml watchman.toml      # read it: publish = false to begin with
+export UNSEENET_VAULT_PASSPHRASE=...
+unseenet-watchman -c watchman.toml init     # the vault and both issuers' keys
+unseenet-watchman -c watchman.toml check "Visit http://example.com now"   # one text
+unseenet-watchman -c watchman.toml run --once   # look once; the batch goes to the log
+unseenet-watchman -c watchman.toml run      # keep watching
+unseenet-watchman -c watchman.toml status   # what is queued, published and spared
+unseenet-watchman -c watchman.toml unreport "<message-id>"   # it was no spam
+```
+
+It needs Tor running (`tor_socks`, default `127.0.0.1:9050`). Run it with
+`publish = false` for a while and read the log: each batch is written there
+as the report it would have been. Only when that looks right, set
+`publish = true`. `contrib/unseenet-watchman.service` runs it under systemd.
+
+### The blocklists
+
+The defaults are [Spamhaus DBL](https://www.spamhaus.org/)
+and [SURBL](https://surbl.org/) (URIBL is in the list, turned off). Check each
+list's terms of use - several are free only for small, non-commercial use.
+Spamhaus may refuse lookups that arrive through Tor exits; the watchman then
+pauses that list for an hour and says so in the log. A free
+DQS key from Spamhaus gives zones that answer. The
+lists and their answer codes are in the config (`[[zone]]`), so a list that
+changes its codes is a config change, not a release.
+
+## How it works
+
+- **Built on the core.** An ordinary Unseenet client on
+  `unseenet.client.session.Session` from
+  [unseenet/unseenet](https://github.com/unseenet/unseenet): reading,
+  postage, ripening and publishing reports are the same code as everywhere.
+  Reasons come from the core's one list, `unseenet.core.reports.REASONS`.
+- **Links.** The hosts of the links in a post are looked up in each list,
+  with their parent domains; the most serious reason wins.
+- **Near-identical texts.** Each post gets a 64-bit SimHash of its words -
+  without quotes, signature, link paths or numbers - and posts at most 3 bits
+  apart are the same. Four 16-bit bands index them, so no pair is compared
+  needlessly. A wave is reported as a whole, earlier posts too. This is also a
+  first try at fingerprint reports
+  ([unseenet#123](https://github.com/unseenet/unseenet/issues/123)).
+- **Batches.** What it finds waits for the next batch (hourly by default):
+  one report article per issuer, at most 1000 entries each.
+
+Labels - profanity, adult content and the like, which describe and never
+sanction - are a different thing and will get their own lists once
+[unseenet#656](https://github.com/unseenet/unseenet/issues/656) is specified.
+
+## Versions and releases
+
+Versions follow [semantic versioning](https://semver.org/) on the same
+principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/development.md#versioning):
+tags `vX.Y.Z` on `main`, the changes in [CHANGELOG.md](CHANGELOG.md), and a
+GitHub release for each tag. Until core 0.6.0 is released, it is built
+against unseenet `main`; then each release names the minor version of
+unseenet it works with (`unseenet>=0.6,<0.7`).
+
+## Part of Unseenet
+
+| Repository | What it is |
+|---|---|
+| [unseenet](https://github.com/unseenet/unseenet) | The protocol (UN-RFCs), the core library, the node and the command-line client |
+| [unseenet-tui](https://github.com/unseenet/unseenet-tui) | The terminal client |
+| [unseenet-gui](https://github.com/unseenet/unseenet-gui) | The graphical client - in a window, booted, or in a browser |
+| [unseenet-portable](https://github.com/unseenet/unseenet-portable) | Builds the portable clients, Terminal and Graphical, with Tor inside |
+| [unseenet-bootable](https://github.com/unseenet/unseenet-bootable) | Builds the bootable images, Terminal and Graphical |
+| [unseenet-docs](https://github.com/unseenet/unseenet-docs) | The site [unseenet.org](https://unseenet.org) |
+| [unseenet-entrance](https://github.com/unseenet/unseenet-entrance) | Web entrances: the graphical client in an ordinary browser |
+| [unseenet-gateway](https://github.com/unseenet/unseenet-gateway) | Gateways to other networks: Usenet, Nostr, Matrix |
+| [unseenet-bots](https://github.com/unseenet/unseenet-bots) | Bots that keep channels filled with current content |
+| [unseenet-helpbot](https://github.com/unseenet/unseenet-helpbot) | The bot that answers questions in `unseenet.help` |
+| [unseenet-watchman](https://github.com/unseenet/unseenet-watchman) | Automatic spam reports that readers may choose to follow |
+| [unseenet-stats](https://github.com/unseenet/unseenet-stats) | Statistics for the network |
+| [unseenet-mcp](https://github.com/unseenet/unseenet-mcp) | An MCP server, so a language model can read and post as you (planning) |
+| [unseenet-demo](https://github.com/unseenet/unseenet-demo) | Demo people, feeds and sites, made with the command-line client |
+
+## License
+
+[Apache License 2.0](LICENSE). The Unseenet logo: CC BY 4.0.
