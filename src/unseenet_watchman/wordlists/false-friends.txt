@@ -1,0 +1,12 @@
+# Words on one language's list that are ordinary words in another. A hit of one of
+# these counts only when the post is in the language of the list that names it.
+slut    # Danish, Norwegian, Swedish: end
+fan     # English, Danish, Norwegian, Dutch, French: a fan
+skit    # English: a sketch
+skid    # English: to skid
+fick    # Swedish: got
+satan   # English, German: the Devil, in religious text
+bite    # English: to bite
+geil    # German: cool
+pis     # English: Raspberry Pis; French: tant pis
+bordel  # Danish, Norwegian, Czech: brothel, said plainly

@@ -1,0 +1,26 @@
+# profanity - no. One word or phrase per line, lower case; whole words and phrases
+# only. Written for unseenet-watchman (Apache-2.0); see SOURCE.md.
+drit
+dritt
+faen
+faens
+forbanna
+forbannet
+fuck
+fucking
+helvete
+helvetes
+jævel
+jævla
+jævlar
+jævlig
+ræva
+rævhøl
+satan
+satans
+shit
+fy faen
+for faen
+faen ta
+dra til helvete
+drit i det

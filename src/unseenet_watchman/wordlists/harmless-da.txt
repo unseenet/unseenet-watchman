@@ -1,3 +1,0 @@
-# Words on another language's list that are ordinary Danish: not counted in Danish posts.
-# One per line. (Rude in Danish too? Then it is not harmless - leave it out.)
-slut

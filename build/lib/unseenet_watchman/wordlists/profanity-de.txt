@@ -1,126 +1,26 @@
-@$$
-abgaslaus
-abschaum
-abzocker
-alki
-analritter
+# profanity - de. One word or phrase per line, lower case; whole words and phrases
+# only. Written for unseenet-watchman (Apache-2.0); see SOURCE.md.
 arsch
-arschficker
-arschgesicht
-arschlecker
 arschloch
-bassdart
-bassdarts
-bimbo
-bratze
-bullenscheiße
-bullshit
-bumsen
-butthole
-buttwipe
-dödel
-fettarsch
-fettsack
-fick
-ficken
-flittchen
-fotze
-fratze
-fuchah
 fuck
-fucka
-fucker
-fuckin
 fucking
-fucks
-fukk
-fukking
-gottverdammt
-gottverdammten
-gottvertammte
-hackfresse
-honk
-hure
-hurensohn
-idiot
-ische
-kackbratze
 kacke
 kacken
-kackwurst
-luder
-milf
-morgenlatte
-motha fuker
-motha fukkah
-motha fukker
-mothafucker
-mothafuker
-mothafukkah
-mothafukker
-mother fucker
-mother fukah
-mother fuker
-mother fukkah
-mother fukker
-motherfucker
-motherfukah
-motherfuker
-motherfukkah
-motherfukker
-muschi
-muthafucker
-muthafukah
-muthafuker
-muthafukkah
-muthafukker
-mutterficker
-möse
-nutte
-onanieren
-pimmel
-pimpern
+pisse
 pissen
-pisser
-poppen
-pussy
-reudig
-schabracke
 scheiss
-scheisser
+scheisse
 scheiß
+scheißdreck
 scheiße
-schiesser
-schlampe
-schlong
-schwanz
-schwanzlutscher
-schweineprister
-shit
-shits
-shitt
-shitter
-shitty
-shity
-sht
-shyt
-shyte
-shytty
-skank
-skanks
-skanky
-slut
-sluts
-slutty
-smut
-tittchen
-titten
-versager
-vixer
-vollpfosten
-voze
-vögeln
-wichse
-wichsen
-wichser
-wixer
+verdammt
+verdammte
+verdammter
+verflucht
+verfluchte
+verdammte scheiße
+verdammt nochmal
+leck mich
+leck mich am arsch
+fick dich
+zum teufel

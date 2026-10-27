@@ -1,0 +1,14 @@
+# profanity - it. One word or phrase per line, lower case; whole words and phrases
+# only. Written for unseenet-watchman (Apache-2.0); see SOURCE.md.
+cazzata
+cazzate
+cazzo
+fanculo
+merda
+minchia
+vaffanculo
+porca miseria
+porca puttana
+porco dio
+che cazzo
+va a cagare

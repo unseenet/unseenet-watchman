@@ -1,130 +1,40 @@
-cock
-diller
-dumme so
-dumme svin
+# profanity - da. One word or phrase per line, lower case; whole words and phrases
+# only. Written for unseenet-watchman (Apache-2.0); see SOURCE.md.
 fandeme
 fanden
 fandens
 fandme
-fanme
-fisse
-fissefjæs
-fissehår
-fissekøn
-fissen
-fisser
-fjols
-fjolsehoved
-for fanden
-for fanden i helvede
-for helvede
-for helvede da
-for pokker
-for satan
 fuck
-fuck af
-fuck dig
-fuck off
+fucked
 fucking
-fucking helvede
-gu fanden
 helvede
 helvedes
-hestepik
-hold din kæft
-hold kæft
-hore
-horer
-horeunge
-idiot
-idioter
-klaphat
-kneppe
-knepper
-kraft edeme
 kraftedeme
-kraftedme
-kraftidiot
-kraftidioti
-kraftstejleme
-kusse
-kussekryller
-kussen
-kys mig i røven
-kælling
-kællinger
+kraftædeme
 lort
 lorte
-lortejob
-lorteliv
-lortelort
-lorten
-lorteskrald
 lortet
-lorteting
-lortevejr
-luder
-ludere
-luderunge
-møgdyr
-møgkælling
-møgkøter
-møgsag
-møgso
-møgsvin
-møgting
-møgtøs
-møgunge
-møgvejr
-nar
-narrøv
-nosser
-nosserne
-pik
-pikfjæs
-pikhoved
-pikhår
-pikken
-pikslikker
-pikslugeri
-piksutteri
 pis
-pis af
-pis og lort
 pisse
-pissedårlig
-pissehamrende
-pisseirriterende
-pissesur
-pokkers
-rend mig
-rend mig i røven
+pissede
+pisser
 røv
-røvballe
-røvballer
-røvbanan
 røven
 røvhul
 røvhuller
-røvskæg
-røvslikker
-røvsnaver
-røvspræke
 satan
-satanedme
 satans
 sateme
-satme
 shit
-sjover
 skid
-skid hul i
 skide
-skiderik
-skvadderhoved
-skøge
-slik mig i røven
-sut min pik
-tosse
-tumpe
-tåbe
+skider
+for fanden
+for satan
+for helvede
+gu fanden
+pis og lort
+rend mig i røven
+skid hul i det
+skid i det
+fanden tage

@@ -21,31 +21,40 @@ from . import labels
 
 NAME = "labels"
 DISPLAY = "Unseenet watchman (labels)"
-POLICY = ("Automatic. Labels posts with profanity, from word lists per language (Danish, "
-          "German, English; from ovos-good-manners-pipeline-plugin): whole words and "
-          "phrases only, at least two in a post or one in a very short post. Describes, "
-          "never sanctions. https://github.com/unseenet/unseenet-watchman")
+POLICY = ("Automatic. Labels posts with profanity (swearing, oaths) and sexual words, "
+          "from its own word lists in nine languages: whole words and phrases only, at "
+          "least two in a post or one in a very short post; insults are not labelled. "
+          "Describes, never sanctions. https://github.com/unseenet/unseenet-watchman")
 
 
 def check(m, st, rules: labels.Rules, log=print) -> bool:
-    """Queue ``profanity`` for a post that should carry it. True when queued."""
+    """Queue the labels a post should carry (profanity, sexual). True when queued."""
     if m.message_id in st.spared or m.author_key in st.spared or m.message_id in st.labelled:
-        return False
-    v = labels.profanity(m.body, rules, getattr(m, "tags", ()) or ())
-    if v is None:
         return False
     if any(p["id"] == m.message_id for p in st.pending_labels):
         return False
-    st.pending_labels.append({"id": m.message_id, "group": m.group, "labels": [labels.LABEL],
-                              "why": v.why})
-    log(f"label: {labels.LABEL} {m.message_id} in {m.group.partition('@')[0]}: {v.why}")
+    # The subject is part of the post - but not in a reply, whose author kept the
+    # subject of the post it answers ("Re: ..."), and did not choose it.
+    subject = "" if getattr(m, "references", None) else (m.subject or "")
+    verdicts = labels.check(f"{subject}\n{m.body or ''}", rules, getattr(m, "tags", ()) or ())
+    if not verdicts:
+        return False
+    why = "; ".join(v.why for v in verdicts)
+    st.pending_labels.append({"id": m.message_id, "group": m.group,
+                              "labels": [v.label for v in verdicts], "why": why})
+    log(f"label: {','.join(v.label for v in verdicts)} {m.message_id} in {m.group.partition('@')[0]}: {why}")
     return True
 
 
 def note_for(entries: list[dict]) -> str:
     gone = sum(1 for e in entries if not e["labels"])
-    told = sum(1 for e in entries if e["labels"])
-    parts = [f"{told} × {labels.LABEL} from word lists"] if told else []
+    counts = {}
+    for e in entries:
+        for label in e["labels"]:
+            counts[label] = counts.get(label, 0) + 1
+    parts = [f"{n} × {label}" for label, n in sorted(counts.items())]
+    if parts:
+        parts[-1] += " from word lists"
     if gone:
         parts.append(f"{gone} taken back")
     note = "automatic: " + "; ".join(parts)

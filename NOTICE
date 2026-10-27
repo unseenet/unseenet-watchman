@@ -1,8 +1,5 @@
 unseenet-watchman
 Copyright 2026 Andreas Lorensen and the Unseenet contributors
 
-This product includes word lists from ovos-good-manners-pipeline-plugin
-(https://github.com/OpenVoiceOS/ovos-good-manners-pipeline-plugin),
-Copyright Andreas Lorensen and the OpenVoiceOS contributors,
-licensed under the Apache License 2.0. See
-src/unseenet_watchman/wordlists/SOURCE.md.
+This product is licensed under the Apache License 2.0 (see LICENSE). Its word lists
+(src/unseenet_watchman/wordlists/) were written for it; see SOURCE.md there.

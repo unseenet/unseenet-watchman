@@ -1,0 +1,25 @@
+# profanity - sv. One word or phrase per line, lower case; whole words and phrases
+# only. Written for unseenet-watchman (Apache-2.0); see SOURCE.md.
+djävla
+djävlar
+fan
+fuck
+fucking
+förbannade
+förbannat
+helvete
+helvetes
+jävla
+jävlar
+jävligt
+satan
+satans
+shit
+skit
+skiten
+fy fan
+för fan
+för helvete
+dra åt helvete
+skit i det
+fan ta
