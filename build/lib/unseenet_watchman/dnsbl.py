@@ -1,0 +1,240 @@
+"""URI blocklists (SURBL, Spamhaus DBL ...), asked through Tor.
+
+A URI blocklist is a DNS zone: ``example.com.multi.surbl.org`` has an A record when
+``example.com`` is listed, and the address (127.0.0.x) says why.
+
+**Why not plain DNS through Tor.** Tor's own resolving (SOCKS RESOLVE) throws away
+every answer that points at an internal address such as 127.0.0.x - a safety rule of
+the Tor client (``ClientDNSRejectInternalAddresses``) that cannot be turned off on the
+real network. Every blocklist answer is such an address, so that way every domain would
+look clean. Instead the watchman asks a **DNS-over-HTTPS** resolver, through Tor: the
+answer is then HTTP content, which Tor does not look into. The resolver learns which
+domains are looked up - links in public posts - and a Tor exit's address, never ours.
+
+**Refusals.** Lists refuse lookups from big public resolvers, in two ways: with an
+error code (``refused`` in a zone's config), or silently, answering "does not exist".
+The silent way would make every domain look clean, so each zone has a **test point**,
+a domain the list always lists. It is looked up at start and every few hours; a zone
+that does not list its own test point is paused and the log says so loudly.
+
+What works through public DoH (tried October 2026): SURBL's ``multi.surbl.org``.
+Spamhaus refuses public resolvers - its free **DQS** key gives zones of its own
+(``<key>.dbl.dq.spamhaus.net``) that answer. URIBL refuses them too. Check each list's
+terms of use; several are free only for small, non-commercial use.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import ssl
+import time
+from dataclasses import dataclass, field
+from urllib.parse import quote, urlsplit
+
+CACHE_SECONDS = 6 * 3600
+PAUSE_SECONDS = 3600
+SELFTEST_SECONDS = 6 * 3600
+DEFAULT_DOH = "https://dns.google/resolve"
+
+
+@dataclass
+class Zone:
+    """One URI blocklist and how to read its answers.
+
+    ``codes``: an answer address to a reason (exact match). ``bits``: the last octet as
+    a bitmask, each bit to a reason (SURBL's and URIBL's multi zones). An answer that
+    matches neither is ignored, so a list that adds a code is never read as more than
+    it says. ``test``: a domain the list always lists (its test point)."""
+    name: str
+    codes: dict[str, str] = field(default_factory=dict)
+    bits: dict[int, str] = field(default_factory=dict)
+    refused: frozenset[str] = frozenset()
+    test: str = ""
+    enabled: bool = True
+
+    def reasons(self, address: str) -> set[str]:
+        if address in self.codes:
+            return {self.codes[address]}
+        if self.bits and address.startswith("127.0.0."):
+            last = int(address.rsplit(".", 1)[1])
+            return {r for b, r in self.bits.items() if last & b}
+        return set()
+
+
+SPAMHAUS_CODES = {"127.0.1.2": "spam", "127.0.1.4": "phishing", "127.0.1.5": "malware",
+                  "127.0.1.6": "malware", "127.0.1.102": "spam", "127.0.1.103": "spam",
+                  "127.0.1.104": "phishing", "127.0.1.105": "malware", "127.0.1.106": "malware"}
+SPAMHAUS_REFUSED = frozenset({"127.255.255.252", "127.255.255.254", "127.255.255.255"})
+SURBL = Zone("multi.surbl.org", bits={8: "phishing", 16: "malware", 64: "spam", 128: "malware"},
+             refused=frozenset({"127.0.0.1"}), test="surbl-org-permanent-test-point.com")
+URIBL = Zone("multi.uribl.com", bits={2: "spam"}, refused=frozenset({"127.0.0.1"}),
+             test="test.uribl.com", enabled=False)
+
+
+def spamhaus_dqs(key: str) -> Zone:
+    """Spamhaus DBL through a DQS key, the zone that answers public resolvers."""
+    return Zone(f"{key}.dbl.dq.spamhaus.net", codes=SPAMHAUS_CODES, refused=SPAMHAUS_REFUSED,
+                test="dbltest.com")
+
+
+def default_zones(dqs_key: str = "") -> list[Zone]:
+    return [SURBL] + ([spamhaus_dqs(dqs_key)] if dqs_key else []) + [URIBL]
+
+
+class ResolveError(OSError):
+    """The resolver could not be asked or did not answer (Tor down, resolver failing)."""
+
+
+def read_dns_json(http: bytes) -> str | None:
+    """The first A record in an HTTP response with DNS JSON; None for "does not exist".
+    ResolveError for anything else (an HTTP error, SERVFAIL ...)."""
+    head, _, body = http.partition(b"\r\n\r\n")
+    status_line = head.split(b"\r\n", 1)[0].split()
+    if len(status_line) < 2 or status_line[1] != b"200":
+        raise ResolveError("resolver answered " + b" ".join(status_line[1:]).decode(errors="replace"))
+    if b"transfer-encoding: chunked" in head.lower():
+        out = b""
+        while body:
+            size, _, rest = body.partition(b"\r\n")
+            n = int(size.split(b";")[0] or b"0", 16)
+            if n == 0:
+                break
+            out, body = out + rest[:n], rest[n + 2:]
+        body = out
+    try:
+        d = json.loads(body)
+    except ValueError as exc:
+        raise ResolveError("resolver did not answer in DNS JSON") from exc
+    status = d.get("Status")
+    if status == 3:
+        return None                                 # NXDOMAIN: not listed
+    if status != 0:
+        raise ResolveError(f"resolver status {status}")
+    for a in d.get("Answer", []):
+        if a.get("type") == 1:
+            return a.get("data")
+    return None
+
+
+async def _socks_connect(reader, writer, host: str, port: int, timeout: float) -> None:
+    writer.write(b"\x05\x01\x00")
+    await writer.drain()
+    if await asyncio.wait_for(reader.readexactly(2), timeout) != b"\x05\x00":
+        raise ResolveError("Tor's SOCKS port refused the greeting")
+    h = host.encode("ascii")
+    writer.write(b"\x05\x01\x00\x03" + bytes([len(h)]) + h + port.to_bytes(2, "big"))
+    await writer.drain()
+    rep = await asyncio.wait_for(reader.readexactly(4), timeout)
+    if rep[1] != 0:
+        raise ResolveError(f"Tor could not reach {host} (SOCKS error {rep[1]})")
+    if rep[3] == 1:
+        await reader.readexactly(4 + 2)
+    elif rep[3] == 4:
+        await reader.readexactly(16 + 2)
+    else:
+        await reader.readexactly((await reader.readexactly(1))[0] + 2)
+
+
+async def doh_resolve(name: str, socks_host: str, socks_port: int, doh: str = DEFAULT_DOH,
+                      timeout: float = 45.0) -> str | None:
+    """Resolve ``name`` (A) with a DNS-over-HTTPS resolver reached through Tor."""
+    url = urlsplit(doh)
+    host, port = url.hostname or "", url.port or 443
+    try:
+        reader, writer = await asyncio.wait_for(asyncio.open_connection(socks_host, socks_port), timeout)
+    except (OSError, asyncio.TimeoutError) as exc:
+        raise ResolveError(f"Tor at {socks_host}:{socks_port}: {exc}") from exc
+    try:
+        await _socks_connect(reader, writer, host, port, timeout)
+        await asyncio.wait_for(writer.start_tls(ssl.create_default_context(), server_hostname=host), timeout)
+        path = (url.path or "/resolve") + f"?name={quote(name)}&type=A"
+        writer.write(f"GET {path} HTTP/1.1\r\nHost: {host}\r\nAccept: application/dns-json\r\n"
+                     "Connection: close\r\n\r\n".encode())
+        await writer.drain()
+        return read_dns_json(await asyncio.wait_for(reader.read(-1), timeout))
+    except (asyncio.IncompleteReadError, asyncio.TimeoutError, ssl.SSLError, ConnectionError) as exc:
+        raise ResolveError(f"no answer from {host}: {exc!r}") from exc
+    finally:
+        writer.close()
+
+
+@dataclass
+class Hit:
+    """A domain listed in a zone, and why."""
+    domain: str
+    zone: str
+    reasons: set[str]
+
+
+class Lookups:
+    """Lookups with a cache; zones paused when they refuse or fail their test point.
+
+    ``resolve(qname)`` returns an address or None; tests pass their own."""
+
+    def __init__(self, zones: list[Zone], resolve, log=print):
+        self.zones = [z for z in zones if z.enabled]
+        self.resolve = resolve
+        self.log = log
+        self._cache: dict[str, tuple[float, str | None]] = {}
+        self._paused: dict[str, float] = {}
+        self._tested = 0.0
+
+    def _pause(self, z: Zone, seconds: float, why: str) -> None:
+        self._paused[z.name] = time.monotonic() + seconds
+        self.log(f"{z.name}: {why}; paused for {seconds / 3600:.0f} h")
+
+    def active(self) -> list[Zone]:
+        now = time.monotonic()
+        return [z for z in self.zones if self._paused.get(z.name, 0) <= now]
+
+    async def selftest(self, force: bool = False) -> None:
+        """Look up each zone's test point; pause a zone that does not list it."""
+        if not force and self._tested and time.monotonic() - self._tested < SELFTEST_SECONDS:
+            return
+        self._tested = time.monotonic()
+        for z in self.zones:
+            if not z.test:
+                continue
+            try:
+                address = await self.resolve(f"{z.test}.{z.name}")
+            except ResolveError as exc:
+                self._pause(z, PAUSE_SECONDS, f"test lookup failed ({exc})")
+                continue
+            if address in z.refused:
+                self._pause(z, SELFTEST_SECONDS, f"refused the lookup ({address}) - "
+                            "a key for the list may be needed")
+            elif not address or not z.reasons(address):
+                self._pause(z, SELFTEST_SECONDS, f"did not list its own test point {z.test} "
+                            f"(answer: {address or 'none'}) - the resolver may be refused silently")
+            else:
+                self._paused.pop(z.name, None)
+
+    async def _ask(self, qname: str) -> str | None:
+        now = time.monotonic()
+        hit = self._cache.get(qname)
+        if hit and now - hit[0] < CACHE_SECONDS:
+            return hit[1]
+        address = await self.resolve(qname)
+        self._cache[qname] = (now, address)
+        return address
+
+    async def check(self, domain: str) -> list[Hit]:
+        """Each active zone that lists ``domain``, with its reasons."""
+        await self.selftest()
+        out = []
+        for z in self.active():
+            try:
+                address = await self._ask(f"{domain}.{z.name}")
+            except ResolveError as exc:
+                self.log(f"blocklist lookups skipped: {exc}")
+                return out
+            if address is None:
+                continue
+            if address in z.refused:
+                self._pause(z, PAUSE_SECONDS, f"refused the lookup ({address})")
+                continue
+            reasons = z.reasons(address)
+            if reasons:
+                out.append(Hit(domain, z.name, reasons))
+        return out

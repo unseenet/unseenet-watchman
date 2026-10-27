@@ -25,7 +25,8 @@ from unseenet.client.session import Session, SessionError
 from unseenet.core.groups import KIND_REACTION, is_key_bound
 from unseenet.core.reports import MAX_ENTRIES
 
-from . import decide, dupes, uris
+from . import decide, dupes, labelling, uris
+from .labels import Rules as LabelRules
 from .dnsbl import Lookups, Zone
 from .state import State
 
@@ -59,6 +60,8 @@ class Config:
     spamhaus_dqs_key: str = ""    # turns Spamhaus DBL on, through its DQS zones
     rules: decide.Rules = field(default_factory=decide.Rules)
     zones: list[Zone] | None = None
+    labels: bool = False          # also a labeller (UN-RFC 0053): profanity
+    label_rules: LabelRules = field(default_factory=LabelRules)
 
 
 # Key-bound groups that others write in: comments under a feed's posts (UN-RFC 0034)
@@ -159,6 +162,8 @@ async def look_group(s: Session, gid: str, cfg: Config, st: State, lookups: Look
             continue
         checked += 1
         new += queue_findings(await check_post(m, lookups, st, cfg, now), st, cfg, now, log)
+        if cfg.labels:
+            labelling.check(m, st, cfg.label_rules, log)
     return checked, new
 
 
@@ -225,6 +230,8 @@ async def start_issuers(s: Session, cfg: Config, log=print) -> None:
         with acting(s, name):
             gid = await s.start_reports(policy=policy, contact=cfg.contact, automatic=True)
         log(f"started {name}'s reports: {gid}")
+    if cfg.labels:
+        await labelling.start(s, cfg.contact, log)
 
 
 async def publish(s: Session | None, st: State, cfg: Config, dry_run: bool, log=print) -> int:
@@ -260,6 +267,8 @@ async def publish(s: Session | None, st: State, cfg: Config, dry_run: bool, log=
         st.pending = [p for p in st.pending if p.message_id not in done_mids]
         st.pending_keys = {k: v for k, v in st.pending_keys.items() if k not in done_keys}
         done += 1
+    if st.pending_labels:
+        done += await labelling.publish(s, st, dry_run, log)
     st.last_batch = time.time()
     st.save()
     return done

@@ -33,6 +33,27 @@ the NoCeM notices of old Usenet.
 text posted from many keys or in many groups, and runs as a dry run until its
 operator turns publishing on.
 
+### Labels, too
+
+With `labels = true` it is also a **labeller**
+([UN-RFC 0053](https://unseenet.org/spec/un-rfc-0053/)) with a third key,
+*Unseenet watchman (labels)*: it gives the warning label `profanity`. Labels
+**describe, they never sanction** - no key is touched, no node acts on them, and
+a reader chooses whether to follow the labeller and what to do with the label
+(show, blur or hide).
+
+- **Word lists** per language - Danish, German, English - from
+  [ovos-good-manners-pipeline-plugin](https://github.com/OpenVoiceOS/ovos-good-manners-pipeline-plugin)
+  (Apache-2.0, see [NOTICE](NOTICE)); `contrib/update-wordlists.sh` fetches newer ones.
+- **The language first**: guessed from a post's common small words, and only that
+  language's list is used - "slut" is rude in English and means "end" in Danish.
+- **Whole words and phrases only**, and a threshold: at least two in a post, or one
+  in a post of at most eight words. One rude word in a long post is no reason to
+  warn anybody.
+- **The author first**: a post its author tagged `profanity` needs no label.
+- A label given by mistake is taken back with `unreport` (it publishes `[]` for
+  that post) and the post is never labelled again.
+
 ### Who watches the watchman?
 
 You do. A report does nothing by itself (UN-RFC 0045 section 5):

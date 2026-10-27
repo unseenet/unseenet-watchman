@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Reads Unseenet's open groups and publishes spam reports (UN-RFC 0045) that readers and nodes may choose to follow"
 readme = "README.md"
 license = "Apache-2.0"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Andreas Lorensen" }]
 requires-python = ">=3.11"
 dependencies = [
@@ -31,6 +31,9 @@ version = { attr = "unseenet_watchman.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+unseenet_watchman = ["wordlists/*.txt", "wordlists/SOURCE.md"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "tests"]
