@@ -259,7 +259,12 @@ async def start_issuers(s: Session, cfg: Config, log=print) -> None:
                                     issuer=name)                  # unseenet#661
         log(f"started {name}'s reports: {gid}")
     if cfg.labels:
-        await labelling.start(s, cfg.contact, log)
+        try:
+            await labelling.start(s, cfg.contact, log)
+        except (SessionError, OSError, ConnectionError) as exc:
+            # e.g. a node whose core does not know labels@ yet: the reports go on
+            log(f"labels are off for now - could not start the labels channel: {exc}")
+            cfg.labels = False
 
 
 async def publish(s: Session | None, st: State, cfg: Config, dry_run: bool, log=print) -> int:
