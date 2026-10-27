@@ -32,7 +32,7 @@ from . import __version__, decide, dupes, labelling, labels, uris
 from .dnsbl import Zone
 from .state import State
 from .watch import (ISSUERS, Config, acting, look, make_lookups, publish,
-                    start_issuers, unreport)
+                    restore_high, start_issuers, unreport)
 
 PASS_ENV = "UNSEENET_VAULT_PASSPHRASE"
 ABOUT = """\
@@ -161,8 +161,8 @@ async def cmd_run(cfg: Config, once: bool, dry_run: bool) -> None:
     if s.nodes and all(is_local(n) for n in s.nodes) and not cfg.tor_socks:
         raise SystemExit("reading a node directly (no onion address), so no Tor is started: "
                          "set tor_socks for the blocklist lookups")
-    s.load_offline()                 # where each group got to: a restart continues there
     st = State.load(cfg.state_file)
+    restore_high(s, st)              # where each group got to: a restart continues there
     lookups = make_lookups(cfg, s, log)
     where = "directly from " + ", ".join(s.nodes) if all(is_local(n) for n in s.nodes) else "over Tor"
     log(f"watchman {__version__}: {'dry run - nothing is published' if dry else 'publishing'}, "
@@ -175,7 +175,7 @@ async def cmd_run(cfg: Config, once: bool, dry_run: bool) -> None:
             await look(s, cfg, st, lookups, log)
             if st.has_pending():
                 await publish(s, st, cfg, dry, log)
-            s.save_offline()
+            st.save()
             return
         await Follower(s, cfg, st, lookups, dry, log).run()
     finally:

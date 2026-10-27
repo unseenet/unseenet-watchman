@@ -22,6 +22,7 @@ class FakeSession:
         self.groups = groups                     # group id -> [Message]
         self.data = {"identities": {"spam": {}, "phishing": {}}}
         self.published, self.withdrawn = [], []
+        self._high = {}
 
     def identity(self, name=None):
         return FakeIdentity(f"ed25519:me-{name}")
@@ -29,8 +30,16 @@ class FakeSession:
     async def list_groups(self, pattern="*"):
         return [GroupInfo(g) for g in self.groups]
 
-    async def fetch_group(self, gid):
-        return self.groups[gid]
+    async def fetch_group(self, gid, skip=None, keep=True):
+        """As the core with keep=False: only what came after the last read."""
+        msgs = self.groups[gid]
+        start = self._high.get(gid, 0)
+        self._high[gid] = len(msgs)
+        return msgs[start:]
+
+    async def skip_to_now(self, gid):
+        self._high[gid] = len(self.groups[gid])
+        return self._high[gid]
 
     def visible(self, msgs):
         return msgs
@@ -76,7 +85,10 @@ async def test_first_look_leaves_earlier_posts_alone(tmp_path):
     s = FakeSession({"dk.snak@f": [msg(1, "dk.snak@f", "ed25519:a", SPAM)]})
     st, c = State(tmp_path / "state.json"), cfg(tmp_path)
     assert await watch.look(s, c, st, lookups(), log=lambda m: None) == 0
-    assert not st.fresh and "<m1@x>" in st.seen and not st.pending
+    assert not st.fresh and not st.pending and st.high == {"dk.snak@f": 1}   # remembered
+    s.groups["dk.snak@f"].append(msg(2, "dk.snak@f", "ed25519:b", SPAM))
+    await watch.look(s, c, st, lookups(), log=lambda m: None)
+    assert [p.message_id for p in st.pending] == ["<m2@x>"]      # only what came after
 
 
 async def test_phishing_link_found_and_published_as_phishing(tmp_path):
@@ -141,3 +153,12 @@ def test_state_round_trip(tmp_path):
     st.save()
     back = State.load(tmp_path / "s.json")
     assert not back.fresh and back.pending[0].message_id == "<a@x>" and "<b@x>" in back.spared
+
+
+def test_restore_high_after_a_restart(tmp_path):
+    st = State(tmp_path / "s.json")
+    st.high = {"g@f": 42}
+    s = FakeSession({})
+    s._high = {"g@f": 7}
+    watch.restore_high(s, st)
+    assert s._high == {"g@f": 42}

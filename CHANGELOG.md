@@ -7,6 +7,11 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
+- **Following every group as the core now allows** (#7, unseenet#669): the first look
+  starts each group at its newest post (`skip_to_now`) instead of fetching everything to
+  leave it alone, and articles are read with `keep=False`, so nothing is cached and memory
+  stays flat as the network grows. How far each group was read is kept in our state, as the
+  session keeps it in memory only with `keep=False`. Issuers start with `issuer=` (unseenet#661).
 - **Labels: every list on every post** (#6): a Danish post with an English
   insult was checked against the Danish list only. Now every list counts, a
   place in the text once; the language (told from the text, never from the

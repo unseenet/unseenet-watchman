@@ -91,6 +91,22 @@ def acting(s: Session, name: str):
         s.act_as(None)
 
 
+def remember_high(s: Session, st: State, gid: str) -> None:
+    """Keep how far a group was read in our state: with ``keep=False`` the session keeps
+    it in memory only (unseenet/unseenet#669), so a restart would read it all again."""
+    high = getattr(s, "_high", {}).get(gid)
+    if high:
+        st.high[gid] = high
+
+
+def restore_high(s: Session, st: State) -> None:
+    """At start: where each group got to, from our state."""
+    h = getattr(s, "_high", None)
+    if h is not None:
+        for gid, n in st.high.items():
+            h[gid] = max(h.get(gid, 0), n)
+
+
 def own_keys(s: Session) -> set[str]:
     return {s.identity(n).key_text for n in s.data.get("identities", {})}
 
@@ -149,10 +165,12 @@ async def look_group(s: Session, gid: str, cfg: Config, st: State, lookups: Look
     ``fetch_group`` fetches only articles after the last one fetched."""
     now = time.time()
     try:
-        msgs = s.visible(await s.fetch_group(gid))
+        # keep=False: nothing in the session's cache, only how far it read (#669)
+        msgs = s.visible(await s.fetch_group(gid, keep=False))
     except (SessionError, OSError, ConnectionError) as exc:
         log(f"{gid.partition('@')[0]}: {exc}")
         return 0, 0
+    remember_high(s, st, gid)
     checked = new = 0
     for m in msgs:
         if m.message_id in st.seen:
@@ -176,16 +194,27 @@ async def look(s: Session, cfg: Config, st: State, lookups: Lookups, log=print) 
     except (SessionError, OSError, ConnectionError) as exc:
         log(f"could not list groups: {exc}")
         return 0
+    if st.fresh:                     # the first look: start every group at its newest post
+        n = 0
+        for g in groups:
+            if wanted(g.group_id, cfg):
+                try:
+                    await s.skip_to_now(g.group_id)
+                    remember_high(s, st, g.group_id)
+                    n += 1
+                except (SessionError, OSError, ConnectionError) as exc:
+                    log(f"{g.group_id.partition('@')[0]}: {exc}")
+        log(f"first look: {n} groups followed from their newest post; nothing earlier is judged")
+        st.fresh = False
+        st.save()
+        return 0
     mine = own_keys(s)
     checked = new = 0
     for g in groups:
         if wanted(g.group_id, cfg):
             c, n = await look_group(s, g.group_id, cfg, st, lookups, mine, log)
             checked, new = checked + c, new + n
-    if st.fresh:
-        log(f"first look: {len(st.seen)} earlier posts left alone")
-        st.fresh = False
-    elif checked:
+    if checked:
         log(f"checked {checked} new posts, {new} findings")
     _expire_keys(st)
     st.save()
@@ -226,9 +255,8 @@ async def start_issuers(s: Session, cfg: Config, log=print) -> None:
     for name, (_, policy) in ISSUERS.items():
         if s.is_issuer(name):
             continue
-        # start_reports acts as the identity in use (an issuer= is unseenet/unseenet#661)
-        with acting(s, name):
-            gid = await s.start_reports(policy=policy, contact=cfg.contact, automatic=True)
+        gid = await s.start_reports(policy=policy, contact=cfg.contact, automatic=True,
+                                    issuer=name)                  # unseenet#661
         log(f"started {name}'s reports: {gid}")
     if cfg.labels:
         await labelling.start(s, cfg.contact, log)

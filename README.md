@@ -184,10 +184,10 @@ config (`[[zone]]`), so a list that changes is a config change, not a release.
 - **Push, not walking the network.** Each node is asked to push every new
   article (`XUN-WATCH *`, UN-RFC 0008), and only the group it lands in is
   fetched, only what is new in it. A full sweep runs hourly to catch what a
-  push missed. Where each group got to is kept, so a restart goes on from
-  there. What is still missing in the core for following every group at
-  scale - starting from now, headers before bodies, reading without caching
-  everything - is [unseenet#669](https://github.com/unseenet/unseenet/issues/669).
+  push missed. The first look starts every group at its newest post without
+  fetching what is there, articles are read without being kept (the session's
+  cache stays empty), and where each group got to is kept in the state, so a
+  restart goes on from there.
 - **Batches.** What it finds waits for the next batch (hourly by default):
   one report article per issuer, at most 1000 entries each.
 
