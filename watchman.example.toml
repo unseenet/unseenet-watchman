@@ -4,10 +4,14 @@
 vault = "~/.local/share/unseenet-watchman/watchman.vault"
 state_file = "~/.local/state/unseenet-watchman/state.json"
 # nodes = ["xxxxxxxx.onion"]      # default: the known-node list
+# Beside a node, read it directly - no Tor, every fetch in milliseconds (set
+# tor_socks then: the blocklists are still asked through Tor). See the README
+# for what that means for a node that wants to stay hidden.
+# nodes = ["127.0.0.1:1119"]
 # Nothing is published until this is true. Run a while with it false and read the
 # log: every batch is written there as the report it would have been.
 publish = false
-interval_minutes = 10            # how often it looks
+sweep_minutes = 60               # a full look now and then; new posts come by push
 batch_minutes = 60               # how often it publishes what it found
 groups = ["*"]                   # group names to read (patterns, the part before @)
 skip_groups = ["unseenet.test*"] # e.g. groups where odd posts are the point

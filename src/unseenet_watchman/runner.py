@@ -3,7 +3,7 @@
     unseenet-watchman -c watchman.toml init              # a vault with both issuers' keys
     unseenet-watchman -c watchman.toml check "text"      # check one text (links via Tor)
     unseenet-watchman -c watchman.toml run --once        # look once, batch, stop
-    unseenet-watchman -c watchman.toml run               # keep watching
+    unseenet-watchman -c watchman.toml run               # keep watching (push)
     unseenet-watchman -c watchman.toml status            # what is queued and published
     unseenet-watchman -c watchman.toml unreport ID       # a post or key was no spam
 
@@ -71,7 +71,7 @@ def load_config(path: str | Path) -> Config:
             vault=Path(w["vault"]).expanduser(),
             state_file=Path(w.get("state_file", "~/.local/state/unseenet-watchman/state.json")).expanduser(),
             nodes=w.get("nodes", []), publish=bool(w.get("publish", False)),
-            interval_minutes=int(w.get("interval_minutes", 10)),
+            sweep_minutes=int(w.get("sweep_minutes", 60)),
             batch_minutes=int(w.get("batch_minutes", 60)),
             groups=w.get("groups", ["*"]), skip_groups=w.get("skip_groups", []),
             contact=w.get("contact", ""), tor_socks=w.get("tor_socks", ""),
@@ -134,24 +134,47 @@ async def publish_profiles(s: Session, log=print) -> None:
         log(f"published {name}'s profile with the bot mark")
 
 
+def use_nodes(s: Session, cfg: Config) -> None:
+    """``nodes`` in the config, when given, are the nodes - all of them."""
+    if cfg.nodes:
+        for n in cfg.nodes:
+            s.add_node(n)
+        s.data["nodes"] = [n for n in s.data["nodes"] if n in cfg.nodes]
+        s.save()
+
+
+def is_local(address: str) -> bool:
+    return not address.split(":")[0].endswith(".onion")
+
+
 async def cmd_run(cfg: Config, once: bool, dry_run: bool) -> None:
+    from .follow import Follower
     log = lambda msg: print(f"{datetime.now():%Y-%m-%d %H:%M:%S} {msg}", flush=True)  # noqa: E731
     dry = dry_run or not cfg.publish
     s = open_session(cfg, log=lambda m: None)
+    use_nodes(s, cfg)
+    if s.nodes and all(is_local(n) for n in s.nodes) and not cfg.tor_socks:
+        raise SystemExit("reading a node directly (no onion address), so no Tor is started: "
+                         "set tor_socks for the blocklist lookups")
+    s.load_offline()                 # where each group got to: a restart continues there
     st = State.load(cfg.state_file)
     lookups = make_lookups(cfg, s, log)
-    log(f"watchman {__version__}: {'dry run - nothing is published' if dry else 'publishing'}")
+    where = "directly from " + ", ".join(s.nodes) if all(is_local(n) for n in s.nodes) else "over Tor"
+    log(f"watchman {__version__}: {'dry run - nothing is published' if dry else 'publishing'}, "
+        f"reading {where}")
     if not dry:
         await start_issuers(s, cfg, log)
         await publish_profiles(s, log)
-    while True:
-        await look(s, cfg, st, lookups, log)
-        due = time.time() - st.last_batch >= cfg.batch_minutes * 60
-        if (st.pending or st.pending_keys) and (due or once):
-            await publish(s, st, cfg, dry, log)
+    try:
         if once:
+            await look(s, cfg, st, lookups, log)
+            if st.pending or st.pending_keys:
+                await publish(s, st, cfg, dry, log)
+            s.save_offline()
             return
-        await asyncio.sleep(cfg.interval_minutes * 60)
+        await Follower(s, cfg, st, lookups, dry, log).run()
+    finally:
+        await s.close()                  # its connections, and its own Tor if it started one
 
 
 async def cmd_check(cfg: Config, text: str) -> None:
@@ -182,6 +205,8 @@ async def cmd_check(cfg: Config, text: str) -> None:
                             if hits else "not listed"))
     fp = dupes.fingerprint(text)
     print(f"fingerprint: {format(fp, '016x') if fp is not None else 'too short to compare'}")
+    if s is not None:
+        await s.close()
 
 
 def cmd_status(cfg: Config) -> None:
@@ -199,6 +224,16 @@ async def cmd_unreport(cfg: Config, target: str) -> None:
     st = State.load(cfg.state_file)
     s = open_session(cfg, log=lambda m: None) if cfg.publish else None
     await unreport(s, st, target)
+
+
+def _stop_on_sigterm() -> None:
+    """systemd stops with SIGTERM: end like Ctrl+C, so the finally blocks run and the
+    session's own Tor is stopped too, never left behind on the vault's folder."""
+    import signal
+
+    def raise_interrupt(*_):
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, raise_interrupt)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -220,7 +255,11 @@ def main(argv: list[str] | None = None) -> None:
     if a.cmd == "init":
         cmd_init(cfg)
     elif a.cmd == "run":
-        asyncio.run(cmd_run(cfg, a.once, a.dry_run))
+        _stop_on_sigterm()
+        try:
+            asyncio.run(cmd_run(cfg, a.once, a.dry_run))
+        except KeyboardInterrupt:
+            pass
     elif a.cmd == "check":
         asyncio.run(cmd_check(cfg, sys.stdin.read() if a.text == "-" else a.text))
     elif a.cmd == "status":

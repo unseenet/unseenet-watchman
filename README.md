@@ -93,6 +93,27 @@ it as well. Run it with
 as the report it would have been. Only when that looks right, set
 `publish = true`. `contrib/unseenet-watchman.service` runs it under systemd.
 
+### Beside a node
+
+Over Tor every fetch is a round trip through an onion circuit, about a
+second. Run the watchman on the same machine as a node and point it at the
+node's local port instead - every fetch then takes milliseconds, and the node
+pushes every new article the moment it lands:
+
+```toml
+[watchman]
+nodes = ["127.0.0.1:1119"]       # the node's --listen
+tor_socks = "127.0.0.1:9050"     # a Tor on the machine, for the blocklists
+```
+
+The blocklist lookups and the reports still go through Tor and the node like
+anyone's. Think about one thing first: **an issuer that runs beside a node
+stops publishing when that node is down**, so somebody watching both could
+tie the issuer's key to the node by their uptime. For a node whose operator
+is known anyway - the project's own, an organisation's backbone node - that
+costs nothing. For a node that wants to stay hidden, run the watchman
+elsewhere, over Tor.
+
 ### The blocklists
 
 A URI blocklist is a DNS zone that answers with a 127.0.0.x address when a
@@ -133,6 +154,13 @@ config (`[[zone]]`), so a list that changes is a config change, not a release.
   needlessly. A wave is reported as a whole, earlier posts too. This is also a
   first try at fingerprint reports
   ([unseenet#123](https://github.com/unseenet/unseenet/issues/123)).
+- **Push, not walking the network.** Each node is asked to push every new
+  article (`XUN-WATCH *`, UN-RFC 0008), and only the group it lands in is
+  fetched, only what is new in it. A full sweep runs hourly to catch what a
+  push missed. Where each group got to is kept, so a restart goes on from
+  there. What is still missing in the core for following every group at
+  scale - starting from now, headers before bodies, reading without caching
+  everything - is [unseenet#669](https://github.com/unseenet/unseenet/issues/669).
 - **Batches.** What it finds waits for the next batch (hourly by default):
   one report article per issuer, at most 1000 entries each.
 

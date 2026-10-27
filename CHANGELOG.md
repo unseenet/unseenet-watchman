@@ -7,6 +7,13 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
+- **Push** (#4): new posts come by push from each node (`XUN-WATCH *`) and
+  only that group is fetched; a full sweep runs hourly (`sweep_minutes`,
+  replacing `interval_minutes`). Where each group got to is kept, so a restart
+  goes on from there instead of fetching everything again.
+- **Beside a node** (#4): `nodes = ["127.0.0.1:1119"]` reads a node directly,
+  without Tor; `tor_socks` is then needed for the blocklists. The README says
+  what that means for a node that wants to stay hidden.
 - **The first watchman** (#1): an automatic issuer of UN-RFC 0045 spam reports.
   Reads the open groups and feeds, finds links to domains on URI blocklists
   (Spamhaus DBL, SURBL; looked up through Tor) and near-identical texts from
