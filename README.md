@@ -113,6 +113,20 @@ unseenet-watchman -c watchman.toml status   # what is queued, published and spar
 unseenet-watchman -c watchman.toml unreport "<message-id>"   # it was no spam
 ```
 
+**Upgrading:** upgrade the core with it - pip does not upgrade a dependency
+named by a git URL by itself:
+
+```sh
+pip install --upgrade --force-reinstall --no-deps "unseenet @ git+https://github.com/unseenet/unseenet@main"
+pip install --upgrade --force-reinstall --no-deps "unseenet-watchman @ git+https://github.com/unseenet/unseenet-watchman.git"
+```
+
+**Never restart it while a key is ripening** (a new issuer or the labeller: one CPU
+busy for a long while, "made ... key" in the log and no channel started yet) - the
+segment being proved starts over. Labels need nodes whose core knows `labels@`
+(UN-RFC 0053, core 0.6.0); on an older node the watchman says so and goes on with
+the reports.
+
 It needs the `tor` program: like every Unseenet client it starts its own Tor
 (or uses a running one, `tor_socks`), and looks the blocklists up through
 it as well. Run it with

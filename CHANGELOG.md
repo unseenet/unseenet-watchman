@@ -7,6 +7,10 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
+- **Labels never stop the reports** (#9): when a node refuses the labels channel (a core
+  before 0.6.0 does not know `labels@`), the watchman logs it, turns labels off and goes
+  on with the reports, instead of exiting. README: upgrading the core too, and never
+  restarting while a key ripens.
 - **Labels, tried on 2400 Usenet posts** (#8): the subject counts too (not in a reply,
   whose author kept it); lines of encoded data (uuencode, yEnc, base64) are not read as
   words ("h0r" was found in one); "pis" is ordinary English (Raspberry Pis), so it is
