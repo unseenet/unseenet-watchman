@@ -58,7 +58,8 @@ PROFILE_LINKS = [{"kind": "github", "value": "https://github.com/unseenet/unseen
 def _zones(rows: list[dict]) -> list[Zone]:
     return [Zone(r["name"], codes=dict(r.get("codes", {})),
                  bits={int(k): v for k, v in r.get("bits", {}).items()},
-                 refused=frozenset(r.get("refused", [])), enabled=r.get("enabled", True))
+                 refused=frozenset(r.get("refused", [])), test=r.get("test", ""),
+                 enabled=r.get("enabled", True))
             for r in rows]
 
 
@@ -73,7 +74,8 @@ def load_config(path: str | Path) -> Config:
             interval_minutes=int(w.get("interval_minutes", 10)),
             batch_minutes=int(w.get("batch_minutes", 60)),
             groups=w.get("groups", ["*"]), skip_groups=w.get("skip_groups", []),
-            contact=w.get("contact", ""), tor_socks=w.get("tor_socks", "127.0.0.1:9050"),
+            contact=w.get("contact", ""), tor_socks=w.get("tor_socks", ""),
+            doh=w.get("doh", ""), spamhaus_dqs_key=w.get("spamhaus_dqs_key", ""),
             rules=decide.Rules(
                 wave_keys=int(r.get("wave_keys", 5)), flood_groups=int(r.get("flood_groups", 5)),
                 key_after=int(r.get("key_after", 3)), key_window=int(r.get("key_window", 7)),
@@ -137,7 +139,7 @@ async def cmd_run(cfg: Config, once: bool, dry_run: bool) -> None:
     dry = dry_run or not cfg.publish
     s = open_session(cfg, log=lambda m: None)
     st = State.load(cfg.state_file)
-    lookups = make_lookups(cfg, log)
+    lookups = make_lookups(cfg, s, log)
     log(f"watchman {__version__}: {'dry run - nothing is published' if dry else 'publishing'}")
     if not dry:
         await start_issuers(s, cfg, log)
@@ -155,7 +157,16 @@ async def cmd_run(cfg: Config, once: bool, dry_run: bool) -> None:
 async def cmd_check(cfg: Config, text: str) -> None:
     """Check one text: its links on the lists (through Tor), and whether it is long
     enough to be compared with others."""
-    lookups = make_lookups(cfg)
+    s = None
+    if not cfg.tor_socks:             # the session's own Tor: start it by asking a node
+        s = open_session(cfg, log=lambda m: None)
+        try:
+            await s.list_groups("watchman.none")
+        except (SessionError, OSError, ConnectionError) as exc:
+            raise SystemExit(f"could not reach a node to start Tor: {exc}") from exc
+    lookups = make_lookups(cfg, s)
+    await lookups.selftest(force=True)
+    print("lists: " + (", ".join(z.name for z in lookups.active()) or "none answering"))
     hs = uris.hosts(text)
     print(f"links: {', '.join(hs) or 'none'}")
     for h in hs:

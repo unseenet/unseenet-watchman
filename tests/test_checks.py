@@ -1,5 +1,3 @@
-import asyncio
-
 import pytest
 
 from unseenet_watchman import decide, dnsbl, dupes, uris
@@ -31,54 +29,58 @@ def test_allowed():
 
 
 def test_zone_codes_and_bits():
-    dbl = dnsbl.DEFAULT_ZONES[0]
+    dbl = dnsbl.spamhaus_dqs("KEY")
+    assert dbl.name == "KEY.dbl.dq.spamhaus.net"
     assert dbl.reasons("127.0.1.4") == {"phishing"}
     assert dbl.reasons("127.0.1.99") == set()          # an unknown code is never read
-    surbl = dnsbl.DEFAULT_ZONES[1]
-    assert surbl.reasons("127.0.0.24") == {"phishing", "malware"}
+    assert dnsbl.SURBL.reasons("127.0.0.24") == {"phishing", "malware"}
+    assert [z.name for z in dnsbl.default_zones()] == ["multi.surbl.org", "multi.uribl.com"]
 
 
-async def test_lookups_cache_and_pause():
+def test_read_dns_json():
+    ok = b'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n' \
+         b'{"Status":0,"Answer":[{"name":"x","type":1,"data":"127.0.0.254"}]}'
+    assert dnsbl.read_dns_json(ok) == "127.0.0.254"
+    chunked = (b'HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n'
+               b'c\r\n{"Status":3}\r\n0\r\n\r\n')
+    assert dnsbl.read_dns_json(chunked) is None
+    with pytest.raises(dnsbl.ResolveError):
+        dnsbl.read_dns_json(b'HTTP/1.1 200 OK\r\n\r\n{"Status":2}')
+    with pytest.raises(dnsbl.ResolveError):
+        dnsbl.read_dns_json(b'HTTP/1.1 503 Busy\r\n\r\n')
+
+
+async def test_lookups_cache_and_refusal_pause():
     asked = []
+    zones = [dnsbl.spamhaus_dqs("K"), dnsbl.SURBL]
 
     async def resolve(q):
         asked.append(q)
-        return {"bad.example.dbl.spamhaus.org": "127.0.1.2",
+        return {"bad.example.K.dbl.dq.spamhaus.net": "127.0.1.2",
+                "dbltest.com.K.dbl.dq.spamhaus.net": "127.0.1.2",
+                "surbl-org-permanent-test-point.com.multi.surbl.org": "127.0.0.254",
                 "x.example.multi.surbl.org": "127.0.0.1"}.get(q)
 
     logs = []
-    lk = dnsbl.Lookups(dnsbl.DEFAULT_ZONES, resolve, log=logs.append)
+    lk = dnsbl.Lookups(zones, resolve, log=logs.append)
     hits = await lk.check("bad.example")
-    assert [(h.zone, h.reasons) for h in hits] == [("dbl.spamhaus.org", {"spam"})]
+    assert [(h.zone, h.reasons) for h in hits] == [("K.dbl.dq.spamhaus.net", {"spam"})]
     await lk.check("bad.example")
-    assert asked.count("bad.example.dbl.spamhaus.org") == 1       # cached
-    assert await lk.check("x.example") == []                      # SURBL refused ...
+    assert asked.count("bad.example.K.dbl.dq.spamhaus.net") == 1     # cached
+    assert await lk.check("x.example") == []                         # SURBL refused ...
     assert "paused" in logs[-1]
     await lk.check("y.example")
-    assert "y.example.multi.surbl.org" not in asked               # ... and paused
+    assert "y.example.multi.surbl.org" not in asked                  # ... and paused
 
 
-async def test_tor_resolve_against_a_fake_socks_port():
-    async def serve(reader, writer):
-        assert await reader.readexactly(3) == b"\x05\x01\x00"
-        writer.write(b"\x05\x00")
-        head = await reader.readexactly(5)
-        name = (await reader.readexactly(head[4])).decode()
-        await reader.readexactly(2)
-        if name == "listed.example.dbl.spamhaus.org":
-            writer.write(b"\x05\x00\x00\x01" + bytes([127, 0, 1, 2]) + b"\x00\x00")
-        else:
-            writer.write(b"\x05\x04\x00\x01" + bytes(6))
-        await writer.drain()
-        writer.close()
+async def test_a_zone_that_does_not_list_its_test_point_is_paused():
+    async def silent(q):                 # a resolver refused silently: "does not exist"
+        return None
 
-    server = await asyncio.start_server(serve, "127.0.0.1", 0)
-    port = server.sockets[0].getsockname()[1]
-    async with server:
-        assert await dnsbl.tor_resolve("listed.example.dbl.spamhaus.org", port=port) == "127.0.1.2"
-        assert await dnsbl.tor_resolve("clean.example.dbl.spamhaus.org", port=port) is None
-    with pytest.raises(dnsbl.TorResolveError):
-        await dnsbl.tor_resolve("x", port=port)
+    logs = []
+    lk = dnsbl.Lookups([dnsbl.SURBL], silent, log=logs.append)
+    await lk.selftest(force=True)
+    assert lk.active() == [] and "test point" in logs[-1]
 
 
 SPAM = ("Amazing offer today only: get rich quick with our crypto plan, "
