@@ -19,7 +19,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-asyncio>=0.23"]
-# Better language detection for labels (about 170 MB, 40 MB in memory for nine languages)
+# Better language detection for labels (about 170 MB, 40 MB in memory for nine
+# languages); the core's unseenet.core.language uses it when installed
 lingua = ["lingua-language-detector>=2.2"]
 
 [project.scripts]

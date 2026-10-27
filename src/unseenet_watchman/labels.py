@@ -41,123 +41,16 @@ is not given again.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from functools import lru_cache
 from importlib.resources import files
 
+# Telling the language, and the words of a post: in the core since unseenet#686, so the
+# clients' language suggestion and the watchman are the same code.
+from unseenet.core.language import (LANGS, STOPWORDS, detect, language,  # noqa: F401
+                                    lingua_language, looks_encoded, words)
+
 LABELS = ("profanity", "sexual")
-LANGS = ("da", "no", "sv", "de", "nl", "en", "fr", "es", "it")
-
-# Small words that tell the languages apart. Only words that are NOT common in a
-# neighbour (Danish, Norwegian and Swedish share many, and so do German and Dutch,
-# French, Spanish and Italian), so that a shared word never decides between them.
-STOPWORDS = {
-    "da": "af noget nogen nogle meget mere hvad hvor bliver havde end ud jer lidt måske "
-          "uden mellem hende siger sige gør gøre vores jeres tak",
-    "no": "av meg deg seg noe noen mye mer hva ble blir enn hadde litt kanskje uten "
-          "mellom sier si gjør gjøre vårt våre takk ikkje eg kva sånn veldig",
-    "sv": "och jag inte att är för till också mycket något någon några vad hur hade än "
-          "lite kanske utan mellan säger säga gör göra tack ska väl bara hon sedan då",
-    "de": "und ich das ist nicht sie zu ein eine einen auch wie von bei nur noch nach "
-          "wenn aber oder wir ihr wird werden kann haben sind mir mich dich dir uns euch "
-          "schon sehr immer doch dass weil diese dieser kein keine nichts über unter "
-          "gegen ohne durch heute jetzt warum",
-    "nl": "het een van ik niet dat zijn op voor maar ook wel nog naar heb hebben zo wat "
-          "hoe waar omdat deze geen niets wij jullie uit bij veel worden wordt werd zou "
-          "moet heel toch alleen gewoon eigenlijk",
-    "en": "the and is are was were be been to of that this it you he she we they not "
-          "with on by from have has had do does did but or if what which who would could "
-          "should will can just about there their them my your our very really because "
-          "when then than these those some any into out up",
-    "fr": "le les des une est pas je il elle nous vous ils qui dans pour avec mais ce "
-          "cette ces très tout tous bien aussi comme être avoir fait peu sans parce quand "
-          "alors rien chez moi toi lui leur aux",           # not du, plus, sur, ton, au: Danish
-    "es": "el los las una es por para pero más muy también como del al su sus yo este "
-          "esta esto eso ese hay está están ser estar tiene tengo hace cuando porque nada "
-          "todo siempre ahora aquí bueno pues sí",
-    "it": "il gli di è che non per anche come sono essere ho hai abbiamo questo questa "
-          "quello perché quando molto tutto sempre ancora già dove cosa niente nel nella "
-          "della delle degli dei sul sua mio tuo suo ci",
-}
-STOPWORDS = {lang: frozenset(ws.split()) for lang, ws in STOPWORDS.items()}
-# Letters and digits, and the @ $ * of spellings like "@$$" and "f*ck"; no other
-# punctuation, so "lort," is "lort".
-_WORD = re.compile(r"[\w@$*]+(?:['’-][\w@$*]+)*")
-
-
-def looks_encoded(line: str) -> bool:
-    """A line of encoded data (base64, uuencode, yEnc) rather than text: long, and
-    without the spaces and the word lengths of a language. Its letter salad would
-    otherwise be read as words (found on Usenet)."""
-    s = line.strip()
-    if len(s) < 40:
-        return False
-    if " " not in s:
-        return True
-    ws = s.split()
-    return sum(len(w) for w in ws) / len(ws) > 12 or sum(len(w) <= 2 for w in ws) / len(ws) > 0.6
-
-
-def words(text: str) -> list[str]:
-    """The words of a post, lower case, without quoted lines, encoded data and the
-    signature."""
-    keep = []
-    for line in (text or "").splitlines():
-        if line.rstrip() == "--":
-            break
-        if not line.lstrip().startswith(">") and not looks_encoded(line):
-            keep.append(line)
-    return [w.lower() for w in _WORD.findall("\n".join(keep))]
-
-
-def language(ws: list[str], min_hits: int = 2) -> str | None:
-    """The post's language among LANGS, or None when it cannot be told: the language
-    with most of its own small words, at least ``min_hits`` and twice the next one's."""
-    counts = sorted(((sum(w in STOPWORDS[l] for w in ws), l) for l in LANGS), reverse=True)
-    (best, lang), (second, _) = counts[0], counts[1]
-    return lang if best >= min_hits and best >= 2 * second else None
-
-
-# Lingua (lingua-language-detector, offline; also what Emkay uses), when installed:
-# asked only when the small words cannot tell, and only taken when it is sure. On 1999
-# Usenet posts: small words alone 78 % right, 0.7 % wrong; with Lingua after them 89 %
-# right, 1.2 % wrong. ``pip install "unseenet-watchman[lingua]"``.
-LINGUA_CODES = {"da": "DA", "no": "NB", "sv": "SV", "de": "DE", "nl": "NL", "en": "EN",
-                "fr": "FR", "es": "ES", "it": "IT"}
-LINGUA_SURE = 0.8
-_lingua = None
-
-
-def _lingua_detector():
-    """The Lingua detector for LANGS, built once; False when Lingua is not installed."""
-    global _lingua
-    if _lingua is None:
-        try:
-            from lingua import IsoCode639_1, LanguageDetectorBuilder
-            _lingua = LanguageDetectorBuilder.from_iso_codes_639_1(
-                *[getattr(IsoCode639_1, c) for c in LINGUA_CODES.values()]).build()
-        except ImportError:
-            _lingua = False
-    return _lingua
-
-
-def lingua_language(ws: list[str]) -> str | None:
-    det = _lingua_detector()
-    if not det:
-        return None
-    conf = det.compute_language_confidence_values(" ".join(ws))
-    if not conf or conf[0].value < LINGUA_SURE:
-        return None
-    code = conf[0].language.iso_code_639_1.name.upper()
-    return next((l for l, c in LINGUA_CODES.items() if c == code), None)
-
-
-def detect(ws: list[str]) -> str | None:
-    """The post's language: its own small words first, which are seldom wrong; Lingua
-    when they cannot tell (if installed); None when neither is sure."""
-    return language(ws) or lingua_language(ws)
-
 
 @dataclass(frozen=True)
 class WordList:
