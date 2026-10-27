@@ -1,0 +1,15 @@
+# profanity - es. One word or phrase per line, lower case; whole words and phrases
+# only. Written for unseenet-watchman (Apache-2.0); see SOURCE.md.
+carajo
+cojones
+coño
+gilipollez
+joder
+jodida
+jodido
+mierda
+me cago en
+puta madre
+maldita sea
+qué coño
+vete a la mierda

@@ -37,28 +37,27 @@ operator turns publishing on.
 
 With `labels = true` it is also a **labeller**
 ([UN-RFC 0053](https://unseenet.org/spec/un-rfc-0053/)) with a third key,
-*Unseenet watchman (labels)*: it gives the warning label `profanity`. Labels
-**describe, they never sanction** - no key is touched, no node acts on them, and
-a reader chooses whether to follow the labeller and what to do with the label
-(show, blur or hide).
+*Unseenet watchman (labels)*, giving two warning labels: **`profanity`** (swearing,
+oaths, vulgar words) and **`sexual`** (sexual and obscene words). Labels **describe,
+they never sanction** - no key is touched, no node acts on them, and a reader chooses
+whether to follow the labeller and what to do with a label (show, blur or hide).
 
-- **Word lists** per language - Danish, German, English - from
-  [ovos-good-manners-pipeline-plugin](https://github.com/OpenVoiceOS/ovos-good-manners-pipeline-plugin)
-  (Apache-2.0, see [NOTICE](NOTICE)); `contrib/update-wordlists.sh` fetches newer ones.
+- **Its own word lists** in nine languages - Danish, Norwegian, Swedish, German,
+  Dutch, English, French, Spanish, Italian - in
+  [`wordlists/`](src/unseenet_watchman/wordlists/SOURCE.md). **Insults are not on
+  them** ("idiot" is rude behaviour, not a kind of language), and neither are words
+  with a harmless meaning in the same language.
 - **Every list on every post** - people mix languages, and a Danish post with an
-  English insult in it is ordinary. A place in the text counts once, however many
-  lists name it.
-- **The language only removes false friends**: told from a post's common small
-  words, it keeps a word that is ordinary in that language from counting - "slut" is
-  rude in English and means "end" in Danish (`wordlists/harmless-da.txt`). The
-  post's own language header is never used for this: anybody can declare Danish and
-  swear in English.
-- **Whole words and phrases only**, and a threshold: at least two in a post, or one
-  in a post of at most eight words. One rude word in a long post is no reason to
-  warn anybody.
-- **The author first**: a post its author tagged `profanity` needs no label.
-- A label given by mistake is taken back with `unreport` (it publishes `[]` for
-  that post) and the post is never labelled again.
+  English oath in it is ordinary. A place in the text counts once.
+- **False friends** count only in their own language: "slut" is rude in English and
+  means "end" in Danish, "fick" is rude in German and means "got" in Swedish. The
+  language is told from a post's own small words - never from its language header:
+  anybody can declare Danish and swear in English.
+- **Whole words and phrases only**, and a threshold: at least two in a post, or one in
+  a post of at most eight words. The subject counts too, but not in a reply.
+- **The author first**: a label the author already gave as a tag is not given again.
+- A label given by mistake is taken back with `unreport` (it publishes `[]` for that
+  post) and the post is never labelled again.
 
 ### Who watches the watchman?
 

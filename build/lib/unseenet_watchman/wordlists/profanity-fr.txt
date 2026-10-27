@@ -1,0 +1,15 @@
+# profanity - fr. One word or phrase per line, lower case; whole words and phrases
+# only. Written for unseenet-watchman (Apache-2.0); see SOURCE.md.
+bordel
+chier
+foutre
+foutu
+merde
+merdique
+putain
+fait chier
+ta gueule
+va te faire foutre
+nique ta mère
+putain de merde
+bordel de merde

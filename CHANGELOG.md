@@ -7,6 +7,12 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
+- **Own word lists, two labels, nine languages** (#10): the OVOS lists are replaced by the
+  watchman's own - `profanity` (swearing, oaths, vulgar words) and `sexual` (sexual and
+  obscene words) in da, no, sv, de, nl, en, fr, es, it. Insults ("idiot") are on
+  neither; words with a harmless meaning in the same language are left out. False
+  friends ("slut", "fick", "fan", "skit" ...) are one file and count only in posts in
+  their own language; the language is told from small words that tell the nine apart.
 - **Labels never stop the reports** (#9): when a node refuses the labels channel (a core
   before 0.6.0 does not know `labels@`), the watchman logs it, turns labels off and goes
   on with the reports, instead of exiting. README: upgrading the core too, and never
