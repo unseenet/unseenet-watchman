@@ -7,6 +7,10 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
+- **Labels, tried on 2400 Usenet posts** (#8): the subject counts too (not in a reply,
+  whose author kept it); lines of encoded data (uuencode, yEnc, base64) are not read as
+  words ("h0r" was found in one); "pis" is ordinary English (Raspberry Pis), so it is
+  in `wordlists/harmless-en.txt`.
 - **Following every group as the core now allows** (#7, unseenet#669): the first look
   starts each group at its newest post (`skip_to_now`) instead of fetching everything to
   leave it alone, and articles are read with `keep=False`, so nothing is cached and memory
