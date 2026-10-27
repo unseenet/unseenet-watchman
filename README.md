@@ -51,8 +51,11 @@ whether to follow the labeller and what to do with a label (show, blur or hide).
   English oath in it is ordinary. A place in the text counts once.
 - **False friends** count only in their own language: "slut" is rude in English and
   means "end" in Danish, "fick" is rude in German and means "got" in Swedish. The
-  language is told from a post's own small words - never from its language header:
-  anybody can declare Danish and swear in English.
+  language is told from a post's own small words, and by
+  [Lingua](https://github.com/pemistahl/lingua-py) when they cannot tell (install
+  `unseenet-watchman[lingua]`, about 170 MB; 89 % right on Usenet posts against 78 %
+  for the small words alone) - never from its language header: anybody can declare
+  Danish and swear in English.
 - **Whole words and phrases only**, and a threshold: at least two in a post, or one in
   a post of at most eight words. The subject counts too, but not in a reply.
 - **The author first**: a label the author already gave as a tag is not given again.

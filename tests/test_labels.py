@@ -117,3 +117,21 @@ async def test_the_subject_counts_but_not_a_replys(tmp_path):
     r = msg(2, "g@f", "ed25519:b", "I agree with what you wrote")
     r.subject, r.references = "Re: fuck dig", ["<m1@x>"]
     assert not labelling.check(r, st, labels.Rules(), log=lambda x: None)
+
+
+def test_detect_asks_lingua_only_when_the_small_words_cannot_tell(monkeypatch):
+    asked = []
+
+    def fake(ws):
+        asked.append(ws)
+        return "sv"
+    monkeypatch.setattr(labels, "lingua_language", fake)
+    assert labels.detect(labels.words("Jeg har lidt travlt, måske noget vi kan tage senere")) == "da"
+    assert asked == []                                        # the small words were sure
+    assert labels.detect(labels.words("hej hej")) == "sv"     # they were not: Lingua
+
+
+def test_lingua_when_installed():
+    pytest.importorskip("lingua")
+    assert labels.lingua_language(labels.words("Tak for hjælpen, vi ses i morgen tidlig")) in ("da", "no", None)
+    assert labels.lingua_language(labels.words("Thanks for the help, see you tomorrow morning")) == "en"
