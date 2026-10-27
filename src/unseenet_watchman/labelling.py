@@ -31,7 +31,11 @@ def check(m, st, rules: labels.Rules, log=print) -> bool:
     """Queue ``profanity`` for a post that should carry it. True when queued."""
     if m.message_id in st.spared or m.author_key in st.spared or m.message_id in st.labelled:
         return False
-    v = labels.profanity(m.body, rules, getattr(m, "tags", ()) or ())
+    # The subject is part of the post - but not in a reply, whose author kept the
+    # subject of the post it answers ("Re: ..."), and did not choose it.
+    subject = "" if getattr(m, "references", None) else (m.subject or "")
+    text = f"{subject}\n{m.body or ''}"
+    v = labels.profanity(text, rules, getattr(m, "tags", ()) or ())
     if v is None:
         return False
     if any(p["id"] == m.message_id for p in st.pending_labels):

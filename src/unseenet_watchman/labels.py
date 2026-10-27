@@ -64,13 +64,27 @@ STOPWORDS = {
 _WORD = re.compile(r"[\w@$*]+(?:['’-][\w@$*]+)*")
 
 
+def looks_encoded(line: str) -> bool:
+    """A line of encoded data (base64, uuencode, yEnc) rather than text: long, and
+    without the spaces and the word lengths of a language. Its letter salad would
+    otherwise be read as words ("h0r" in a uuencoded file, found on Usenet)."""
+    s = line.strip()
+    if len(s) < 40:
+        return False
+    if " " not in s:
+        return True
+    ws = s.split()
+    return sum(len(w) for w in ws) / len(ws) > 12 or sum(len(w) <= 2 for w in ws) / len(ws) > 0.6
+
+
 def words(text: str) -> list[str]:
-    """The words of a post, lower case, without quoted lines and the signature."""
+    """The words of a post, lower case, without quoted lines, encoded data and the
+    signature."""
     keep = []
     for line in (text or "").splitlines():
         if line.rstrip() == "--":
             break
-        if not line.lstrip().startswith(">"):
+        if not line.lstrip().startswith(">") and not looks_encoded(line):
             keep.append(line)
     return [w.lower() for w in _WORD.findall("\n".join(keep))]
 

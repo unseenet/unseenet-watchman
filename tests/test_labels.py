@@ -80,3 +80,28 @@ def test_false_friends_only_in_their_own_language():
 def test_one_place_counts_once_across_lists():
     # "fuck dig" is a Danish phrase; "fuck" alone is on several lists
     assert labels.profanity("fuck dig").hits == ["fuck dig"]
+
+
+def test_encoded_data_is_not_text():
+    assert labels.looks_encoded("M9V]D;&5S(&]F('1H92!W;W)L9\"!A;F0@=&AE(&9I<G-T(&]F")
+    assert labels.looks_encoded("j ofx r * m d h0r k r r u c bq 6 p _qv bj h0r f p ww i qz x")
+    assert not labels.looks_encoded("This is an ordinary line of English text that goes on a while.")
+    assert labels.words("hello there\nj ofx r * m d h0r k r r u c bq 6 p _qv bj h0r f p ww i") == ["hello", "there"]
+
+
+def test_raspberry_pis_are_not_danish():
+    assert labels.profanity("I tend to use those on my pis, and several just use pis for that") is None
+
+
+async def test_the_subject_counts_too(tmp_path):
+    st = State(tmp_path / "s.json")
+    m = msg(1, "g@f", "ed25519:a", "see the attachment")
+    m.subject = "fuck dig"
+    assert labelling.check(m, st, labels.Rules(), log=lambda x: None)
+
+
+async def test_a_replys_inherited_subject_does_not_count(tmp_path):
+    st = State(tmp_path / "s.json")
+    m = msg(2, "g@f", "ed25519:b", "I agree with what you wrote")
+    m.subject, m.references = "Re: fuck dig", ["<m1@x>"]
+    assert not labelling.check(m, st, labels.Rules(), log=lambda x: None)
