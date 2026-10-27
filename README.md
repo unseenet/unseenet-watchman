@@ -215,10 +215,17 @@ sanction - are a different thing and will get their own lists once
 
 Versions follow [semantic versioning](https://semver.org/) on the same
 principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/development.md#versioning):
-tags `vX.Y.Z` on `main`, the changes in [CHANGELOG.md](CHANGELOG.md), and a
-GitHub release for each tag. Until core 0.6.0 is released, it is built
-against unseenet `main`; then each release names the minor version of
-unseenet it works with (`unseenet>=0.6,<0.7`).
+tags `vX.Y.Z` on `main`, the changes in [CHANGELOG.md](CHANGELOG.md), a GitHub
+release and a [PyPI](https://pypi.org/p/unseenet-watchman) release for each tag
+(trusted publishing, no stored token). Each release names the minor version of
+unseenet it works with (`unseenet>=0.6,<0.7`). The first, 0.1.0, comes with core
+0.6.0 - until then it is built against unseenet `main`, and the release workflow
+refuses to publish while the core is named by a git URL.
+
+To release: move the entries under `## [Unreleased]` in `CHANGELOG.md` to a
+new `## [X.Y.Z] - YYYY-MM-DD` section, set `__version__` in
+`src/unseenet_watchman/__init__.py`, commit, then
+`git tag -a vX.Y.Z -m "unseenet-watchman X.Y.Z" && git push origin vX.Y.Z`.
 
 ## Part of Unseenet
 
