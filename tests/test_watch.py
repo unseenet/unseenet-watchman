@@ -55,8 +55,9 @@ def cfg(tmp_path: Path, **rules) -> watch.Config:
 
 def lookups():
     async def resolve(q):
-        return "127.0.1.4" if q == "scam.example.dbl.spamhaus.org" else None
-    return dnsbl.Lookups(dnsbl.DEFAULT_ZONES, resolve, log=lambda m: None)
+        return {"scam.example.K.dbl.dq.spamhaus.net": "127.0.1.4",
+                "dbltest.com.K.dbl.dq.spamhaus.net": "127.0.1.2"}.get(q)
+    return dnsbl.Lookups([dnsbl.spamhaus_dqs("K")], resolve, log=lambda m: None)
 
 
 def test_wanted():

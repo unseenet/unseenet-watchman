@@ -66,9 +66,9 @@ channel, so you can follow exactly what you want:
   and a sealed private post is never reported. Feeds are read, because others
   comment there.
 - **Nothing from before its first look.** It leaves earlier posts alone.
-- **Every lookup through Tor.** Blocklists are DNS zones; the watchman asks
-  them through Tor's SOCKS port, so neither the lists nor a resolver learn
-  where it runs.
+- **Every lookup through Tor**, with DNS-over-HTTPS, so neither the lists nor
+  the resolver learn where it runs. A list that fails its own test point is
+  paused, never trusted to say "clean".
 - **Mistakes are taken back.** `unreport` withdraws the report that named a
   post or key, publishes the rest of it again, and never reports it again.
 
@@ -86,21 +86,37 @@ unseenet-watchman -c watchman.toml status   # what is queued, published and spar
 unseenet-watchman -c watchman.toml unreport "<message-id>"   # it was no spam
 ```
 
-It needs Tor running (`tor_socks`, default `127.0.0.1:9050`). Run it with
+It needs the `tor` program: like every Unseenet client it starts its own Tor
+(or uses a running one, `tor_socks`), and looks the blocklists up through
+it as well. Run it with
 `publish = false` for a while and read the log: each batch is written there
 as the report it would have been. Only when that looks right, set
 `publish = true`. `contrib/unseenet-watchman.service` runs it under systemd.
 
 ### The blocklists
 
-The defaults are [Spamhaus DBL](https://www.spamhaus.org/)
-and [SURBL](https://surbl.org/) (URIBL is in the list, turned off). Check each
-list's terms of use - several are free only for small, non-commercial use.
-Spamhaus may refuse lookups that arrive through Tor exits; the watchman then
-pauses that list for an hour and says so in the log. A free
-DQS key from Spamhaus gives zones that answer. The
-lists and their answer codes are in the config (`[[zone]]`), so a list that
-changes its codes is a config change, not a release.
+A URI blocklist is a DNS zone that answers with a 127.0.0.x address when a
+domain is listed. **Tor drops such answers** when it resolves a name itself -
+a safety rule of the Tor client - so through plain DNS every domain would look
+clean. The watchman therefore asks a **DNS-over-HTTPS** resolver *through* Tor
+(`doh`, default Google's); the resolver sees which domains are looked up -
+links in public posts - and a Tor exit, never the watchman.
+
+Lists refuse big public resolvers, sometimes silently with "does not exist".
+So each list has a **test point**, a domain it always lists, looked up at start
+and every 6 hours: a list that does not list its own test point is paused, and
+the log says why. What that showed in October 2026:
+
+| List | Through public DoH | Default |
+|---|---|---|
+| [SURBL](https://surbl.org/) `multi.surbl.org` | answers | on |
+| [Spamhaus](https://www.spamhaus.org/) DBL | refuses (via Google silently) | on with a free DQS key (`spamhaus_dqs_key`) |
+| URIBL `multi.uribl.com` | refuses | off |
+
+Check each list's terms of use - several are free only for small,
+non-commercial use. The lists, their answer codes and test points are in the
+config (`[[zone]]`), so a list that changes is a config change, not a release.
+`check` shows which lists answer before it checks a text.
 
 ## How it works
 

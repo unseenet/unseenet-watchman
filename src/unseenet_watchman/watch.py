@@ -54,7 +54,9 @@ class Config:
     groups: list[str] = field(default_factory=lambda: ["*"])
     skip_groups: list[str] = field(default_factory=list)
     contact: str = ""
-    tor_socks: str = "127.0.0.1:9050"
+    tor_socks: str = ""           # "": the Tor the session uses; or host:port
+    doh: str = ""                 # the DNS-over-HTTPS resolver (dnsbl.DEFAULT_DOH)
+    spamhaus_dqs_key: str = ""    # turns Spamhaus DBL on, through its DQS zones
     rules: decide.Rules = field(default_factory=decide.Rules)
     zones: list[Zone] | None = None
 
@@ -283,10 +285,26 @@ async def unreport(s: Session | None, st: State, target: str, log=print) -> bool
     return True
 
 
-def make_lookups(cfg: Config, log=print) -> Lookups:
-    from functools import partial
+def make_lookups(cfg: Config, s: Session | None = None, log=print) -> Lookups:
+    """Lookups with DNS-over-HTTPS through ``tor_socks``, or - when it is empty -
+    through the same Tor the session reads the nodes with (dnsbl explains why not
+    plain DNS)."""
+    from .dnsbl import DEFAULT_DOH, ResolveError, default_zones, doh_resolve
+    zones = cfg.zones if cfg.zones is not None else default_zones(cfg.spamhaus_dqs_key)
+    doh = cfg.doh or DEFAULT_DOH
 
-    from .dnsbl import DEFAULT_ZONES, tor_resolve
-    host, _, port = cfg.tor_socks.rpartition(":")
-    return Lookups(cfg.zones if cfg.zones is not None else DEFAULT_ZONES,
-                   partial(tor_resolve, host=host or "127.0.0.1", port=int(port)), log=log)
+    def socks() -> tuple[str, int]:
+        if cfg.tor_socks:
+            host, _, port = cfg.tor_socks.rpartition(":")
+            return host or "127.0.0.1", int(port)
+        t = s.tor_in_use() if s is not None else None
+        if t is not None:
+            return t.host, t.port
+        if s is not None and s.tor is not None and s.tor.alive():
+            return "127.0.0.1", s.tor.socks_port
+        raise ResolveError("the session's Tor is not running yet")
+
+    async def resolve(q: str):
+        host, port = socks()
+        return await doh_resolve(q, host, port, doh)
+    return Lookups(zones, resolve, log=log)

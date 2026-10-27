@@ -12,7 +12,10 @@ batch_minutes = 60               # how often it publishes what it found
 groups = ["*"]                   # group names to read (patterns, the part before @)
 skip_groups = ["unseenet.test*"] # e.g. groups where odd posts are the point
 # contact = "inbox@..."          # where to object; default: the issuer's own inbox
-tor_socks = "127.0.0.1:9050"     # every blocklist lookup goes through Tor
+# tor_socks = "127.0.0.1:9050"   # default: the Tor the watchman reads the nodes with;
+                                 # every blocklist lookup goes through Tor either way
+# doh = "https://dns.google/resolve"   # the DNS-over-HTTPS resolver, reached through Tor
+# spamhaus_dqs_key = "..."       # turns Spamhaus DBL on (its free DQS key)
 
 [rules]
 wave_keys = 5        # the same text from this many keys: spam
@@ -24,17 +27,16 @@ allow_keys = []      # never reported: the project's bots, for one
 allow_domains = ["unseenet.org", "unseenet.net", "github.com", "wikipedia.org",
                  "torproject.org"]
 
-# URI blocklists. Leave these out to use the defaults (Spamhaus DBL and SURBL; URIBL
-# off). Check each list's terms: several are free only for small, non-commercial use.
-# Spamhaus may refuse lookups through Tor exits; with a free DQS key, use its zone
-# instead ("<key>.dbl.dq.spamhaus.net") with the same codes.
-#
-# [[zone]]
-# name = "dbl.spamhaus.org"
-# codes = { "127.0.1.2" = "spam", "127.0.1.4" = "phishing", "127.0.1.5" = "malware" }
-# refused = ["127.255.255.252", "127.255.255.254", "127.255.255.255"]
+# Blocklists are asked through Tor with DNS-over-HTTPS: plain DNS through Tor drops
+# every blocklist answer (they are 127.0.0.x addresses). Each list's test point is
+# looked up at start and every 6 hours; a list that fails it is paused and logged.
+# Default lists: SURBL (works through public DoH). Spamhaus DBL refuses public
+# resolvers, and is turned on with a free DQS key (spamhaus_dqs_key above).
+# Or replace the lists entirely ([[zone]], each with its test point). Check each
+# list's terms: several are free only for small, non-commercial use.
 #
 # [[zone]]
 # name = "multi.surbl.org"
 # bits = { 8 = "phishing", 16 = "malware", 64 = "spam", 128 = "malware" }
 # refused = ["127.0.0.1"]
+# test = "surbl-org-permanent-test-point.com"

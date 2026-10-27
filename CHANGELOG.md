@@ -15,3 +15,7 @@ All notable changes to unseenet-watchman are listed here. The format follows
   both `automatic: true`, each with a note saying why. Keys only after repeated
   findings, for 30 days. A dry run until `publish = true`; `unreport` takes a
   mistake back. Commands `init`, `check`, `run`, `status`, `unreport`.
+- **Blocklists through DNS-over-HTTPS** (#1): Tor drops DNS answers that are
+  127.0.0.x, which is every blocklist answer, so lookups go to a DoH resolver
+  through Tor. Each list has a test point checked every 6 hours; a list that
+  fails it is paused. SURBL on by default, Spamhaus DBL with a DQS key, URIBL off.
