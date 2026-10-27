@@ -7,6 +7,8 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
+- **Releases** (#14): a release workflow - GitHub release and PyPI (trusted publishing),
+  refusing to publish while the core is named by a git URL.
 - **The language from the core** (#13, unseenet#686): `words`, `language`, `detect` and
   the small words now come from `unseenet.core.language`, the same code the clients use to
   suggest a post's language; the watchman's own copy is gone. Same results on the 2400
