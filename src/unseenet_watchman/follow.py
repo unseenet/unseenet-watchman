@@ -96,7 +96,7 @@ class Follower:
                     await look(self.s, self.cfg, self.st, self.lookups, self.log)
                     next_sweep = time.monotonic() + self.cfg.sweep_minutes * 60
                 due = time.time() - self.st.last_batch >= self.cfg.batch_minutes * 60
-                if (self.st.pending or self.st.pending_keys) and due:
+                if self.st.has_pending() and due:
                     await publish(self.s, self.st, self.cfg, self.dry, self.log)
                 self.save_if_due()
         finally:

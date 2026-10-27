@@ -28,7 +28,7 @@ from pathlib import Path
 from unseenet.client.session import Session, SessionError
 from unseenet.core.vault import Vault
 
-from . import __version__, decide, dupes, uris
+from . import __version__, decide, dupes, labelling, labels, uris
 from .dnsbl import Zone
 from .state import State
 from .watch import (ISSUERS, Config, acting, look, make_lookups, publish,
@@ -82,7 +82,10 @@ def load_config(path: str | Path) -> Config:
                 key_days=min(int(r.get("key_days", 30)), 365),
                 allow_keys=frozenset(r.get("allow_keys", [])),
                 allow_domains=frozenset(d.lower() for d in r.get("allow_domains", []))),
-            zones=_zones(d["zone"]) if "zone" in d else None)
+            zones=_zones(d["zone"]) if "zone" in d else None,
+            labels=bool(w.get("labels", False)),
+            label_rules=labels.Rules(min_hits=int(d.get("labels", {}).get("min_hits", 2)),
+                                     short_words=int(d.get("labels", {}).get("short_words", 8))))
     except KeyError as exc:
         raise SystemExit(f"{path}: missing {exc}") from exc
 
@@ -118,7 +121,9 @@ def cmd_init(cfg: Config) -> None:
 async def publish_profiles(s: Session, log=print) -> None:
     """Each issuer's public profile, with the bot mark (UN-RFC 0022), once."""
     from unseenet.core.profiles import make_profile
-    for name in ISSUERS:
+    for name in [*ISSUERS, labelling.NAME]:
+        if name not in s.data["identities"]:
+            continue                                  # the labeller, when labels are off
         flag = f"watchman_profile_{__version__.split('.dev')[0]}"
         if s.data["identities"][name].get(flag):
             continue
@@ -168,7 +173,7 @@ async def cmd_run(cfg: Config, once: bool, dry_run: bool) -> None:
     try:
         if once:
             await look(s, cfg, st, lookups, log)
-            if st.pending or st.pending_keys:
+            if st.has_pending():
                 await publish(s, st, cfg, dry, log)
             s.save_offline()
             return
@@ -218,11 +223,19 @@ def cmd_status(cfg: Config) -> None:
     print(f"reported now: {len(st.reported_posts)} posts, {len(st.reported_keys)} keys; spared: {len(st.spared)}")
     for f in st.pending[:20]:
         print(f"  {f.reason:8} {f.message_id} {f.group.partition('@')[0]}: {f.why}")
+    print(f"labels: {len(st.labelled)} posts labelled, {len(st.pending_labels)} queued")
+    for e in st.pending_labels[:20]:
+        print(f"  {','.join(e['labels']) or 'take back':9} {e['id']} {e['group'].partition('@')[0]}: {e['why']}")
 
 
 async def cmd_unreport(cfg: Config, target: str) -> None:
     st = State.load(cfg.state_file)
     s = open_session(cfg, log=lambda m: None) if cfg.publish else None
+    if target in st.labelled or any(e["id"] == target for e in st.pending_labels):
+        labelling.unlabel(st, target)                # goes out with the next batch
+        st.save()
+        if target not in st.reported_posts:
+            return
     await unreport(s, st, target)
 
 
@@ -248,7 +261,8 @@ def main(argv: list[str] | None = None) -> None:
     c = sub.add_parser("check", help="check one text, or - for standard input")
     c.add_argument("text")
     sub.add_parser("status", help="what is queued, published and spared")
-    u = sub.add_parser("unreport", help="a post (Message-ID) or key that was no spam")
+    u = sub.add_parser("unreport", help="a post (Message-ID) or key that was no spam, "
+                                        "or a post labelled by mistake")
     u.add_argument("target")
     a = p.parse_args(argv)
     cfg = load_config(a.config)

@@ -40,6 +40,8 @@ class State:
         self.spared: set[str] = set()                  # posts and keys never to report
         self.keys = KeyCounter()
         self.last_batch = 0.0
+        self.pending_labels: list[dict] = []           # {id, group, labels, why}
+        self.labelled: dict[str, dict] = {}            # post -> {group, article}
 
     @classmethod
     def load(cls, path: Path) -> "State":
@@ -58,6 +60,8 @@ class State:
         st.spared = set(d.get("spared", []))
         st.keys = KeyCounter(d.get("key_hits", {}))
         st.last_batch = d.get("last_batch", 0.0)
+        st.pending_labels = d.get("pending_labels", [])
+        st.labelled = d.get("labelled", {})
         return st
 
     def save(self) -> None:
@@ -70,11 +74,15 @@ class State:
              "pending": [asdict(f) for f in self.pending], "pending_keys": self.pending_keys,
              "published": self.published, "reported_posts": self.reported_posts,
              "reported_keys": self.reported_keys, "spared": sorted(self.spared),
-             "key_hits": self.keys.hits, "last_batch": self.last_batch}
+             "key_hits": self.keys.hits, "last_batch": self.last_batch,
+             "pending_labels": self.pending_labels, "labelled": self.labelled}
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(json.dumps(d))
         os.replace(tmp, self.path)
+
+    def has_pending(self) -> bool:
+        return bool(self.pending or self.pending_keys or self.pending_labels)
 
     def queue(self, f: Finding) -> bool:
         """Queue a finding unless the post is reported, queued or spared already."""

@@ -7,6 +7,13 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
+- **Labeller** (#2): with `labels = true` a third key, *Unseenet watchman
+  (labels)*, gives the warning label `profanity` (UN-RFC 0053) from the word
+  lists of ovos-good-manners-pipeline-plugin (da, de, en). The language is
+  told from a post's small words first, so only its own list is used; whole
+  words and phrases only, at least two (one in a post of at most eight
+  words); never when the author tagged it. Batched with the reports; taken
+  back with `unreport`, which publishes `[]` for the post.
 - **Push** (#4): new posts come by push from each node (`XUN-WATCH *`) and
   only that group is fetched; a full sweep runs hourly (`sweep_minutes`,
   replacing `interval_minutes`). Where each group got to is kept, so a restart
