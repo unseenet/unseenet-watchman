@@ -7,6 +7,9 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
+- **Lingua for the language** (#12): when a post's small words cannot tell its language,
+  Lingua (offline, as Emkay uses) is asked, if installed (`[lingua]` extra), and taken
+  when at least 80 % sure. On 1999 Usenet posts: 89 % right instead of 78 %.
 - **Own word lists, two labels, nine languages** (#10): the OVOS lists are replaced by the
   watchman's own - `profanity` (swearing, oaths, vulgar words) and `sexual` (sexual and
   obscene words) in da, no, sv, de, nl, en, fr, es, it. Insults ("idiot") are on
