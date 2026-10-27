@@ -74,8 +74,7 @@ class Follower:
 
     def save_if_due(self, force: bool = False) -> None:
         if force or time.monotonic() - self._saved >= SAVE_SECONDS:
-            self.s.save_offline()                # where each group got to, for a restart
-            self.st.save()
+            self.st.save()                       # with where each group got to (state.high)
             self._saved = time.monotonic()
 
     async def run(self) -> None:

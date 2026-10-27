@@ -38,9 +38,9 @@ async def test_handle_dirty_fetches_only_the_pushed_group(tmp_path):
     fetched = []
     real = s.fetch_group
 
-    async def spy(gid):
+    async def spy(gid, **kw):
         fetched.append(gid)
-        return await real(gid)
+        return await real(gid, **kw)
     s.fetch_group = spy
     st = State(tmp_path / "s.json")
     st.fresh = False
