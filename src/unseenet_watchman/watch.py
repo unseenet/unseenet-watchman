@@ -49,7 +49,7 @@ class Config:
     state_file: Path
     nodes: list[str] = field(default_factory=list)
     publish: bool = False
-    interval_minutes: int = 10
+    sweep_minutes: int = 60       # a full look now and then; push does the rest
     batch_minutes: int = 60
     groups: list[str] = field(default_factory=lambda: ["*"])
     skip_groups: list[str] = field(default_factory=list)
@@ -140,9 +140,32 @@ def queue_findings(found: list[decide.Finding], st: State, cfg: Config, now: flo
     return new
 
 
-async def look(s: Session, cfg: Config, st: State, lookups: Lookups, log=print) -> int:
-    """Fetch what is new in every wanted group and check it. Returns new findings."""
+async def look_group(s: Session, gid: str, cfg: Config, st: State, lookups: Lookups,
+                     mine: set[str], log=print) -> tuple[int, int]:
+    """Fetch what is new in one group and check it: (posts checked, new findings).
+    ``fetch_group`` fetches only articles after the last one fetched."""
     now = time.time()
+    try:
+        msgs = s.visible(await s.fetch_group(gid))
+    except (SessionError, OSError, ConnectionError) as exc:
+        log(f"{gid.partition('@')[0]}: {exc}")
+        return 0, 0
+    checked = new = 0
+    for m in msgs:
+        if m.message_id in st.seen:
+            continue
+        st.seen[m.message_id] = now
+        if st.fresh or not _judge(m, mine, cfg):
+            continue
+        checked += 1
+        new += queue_findings(await check_post(m, lookups, st, cfg, now), st, cfg, now, log)
+    return checked, new
+
+
+async def look(s: Session, cfg: Config, st: State, lookups: Lookups, log=print) -> int:
+    """A sweep: every wanted group on the nodes. The first one only notes what is there;
+    after that push brings new posts (``follow``) and a sweep now and then catches what
+    a push missed. Returns new findings."""
     try:
         groups = await s.list_groups("*")
     except (SessionError, OSError, ConnectionError) as exc:
@@ -151,21 +174,9 @@ async def look(s: Session, cfg: Config, st: State, lookups: Lookups, log=print) 
     mine = own_keys(s)
     checked = new = 0
     for g in groups:
-        if not wanted(g.group_id, cfg):
-            continue
-        try:
-            msgs = s.visible(await s.fetch_group(g.group_id))
-        except (SessionError, OSError, ConnectionError) as exc:
-            log(f"{g.group_id.partition('@')[0]}: {exc}")
-            continue
-        for m in msgs:
-            if m.message_id in st.seen:
-                continue
-            st.seen[m.message_id] = now
-            if st.fresh or not _judge(m, mine, cfg):
-                continue
-            checked += 1
-            new += queue_findings(await check_post(m, lookups, st, cfg, now), st, cfg, now, log)
+        if wanted(g.group_id, cfg):
+            c, n = await look_group(s, g.group_id, cfg, st, lookups, mine, log)
+            checked, new = checked + c, new + n
     if st.fresh:
         log(f"first look: {len(st.seen)} earlier posts left alone")
         st.fresh = False

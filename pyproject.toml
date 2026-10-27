@@ -33,6 +33,6 @@ version = { attr = "unseenet_watchman.__version__" }
 where = ["src"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "tests"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
