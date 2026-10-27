@@ -4,11 +4,18 @@ A label describes, it never sanctions: no keys, no effect on nodes or postage, a
 readers follow a labeller only by choice. This one only gives the warning label
 ``profanity`` (``unseenet.core.tags.WARNINGS``).
 
-**Language first.** A post's language is guessed from its common small words
-("og", "der", "und", "the" ...) among the languages there are word lists for, and only
-that language's list is used - so a word that is rude in one language and harmless in
-another is not counted against the wrong post. When the language cannot be told, every
-list is tried, but the hits of one language must reach the threshold on their own.
+**Every list, always.** People mix languages - a Danish post with an English insult
+in it is ordinary - so every list is checked on every post, and a place in the text
+counts once however many lists name it.
+
+**The language only removes false friends**: a word that is rude in one language and
+ordinary in another ("slut" is rude in English and means "end" in Danish). The post's
+language is told from its common small words ("og", "der", "und", "the" ...), and a
+word on ``wordlists/harmless-<language>.txt`` is not counted in a post in that language.
+
+**Never from the post's own language header** (``Content-Language``, unseenet#671):
+anybody can write one thing there and swear in another language, so it decides
+nothing here.
 
 **Whole words and whole phrases only**, so a harmless word containing a rude one is
 never a hit (the Scunthorpe problem). Compound words ("lortesystem") are missed on
@@ -81,18 +88,38 @@ class WordList:
     single: frozenset[str]
     phrases: tuple[tuple[str, ...], ...]
 
-    def hits(self, ws: list[str]) -> list[str]:
-        """The words and phrases of the list in ``ws``, each time they occur. A word
-        inside a phrase that matched counts once, as the phrase."""
-        out, covered = [], set()
-        for p in sorted(self.phrases, key=len, reverse=True):
+    def spans(self, ws: list[str]) -> list[tuple[int, int, str]]:
+        """Where the list's words and phrases are in ``ws``: (start, end, text)."""
+        out = [(i, i + 1, w) for i, w in enumerate(ws) if w in self.single]
+        for p in self.phrases:
             n = len(p)
-            for i in range(len(ws) - n + 1):
-                if tuple(ws[i:i + n]) == p and not covered & set(range(i, i + n)):
-                    out.append(" ".join(p))
-                    covered.update(range(i, i + n))
-        out += [w for i, w in enumerate(ws) if w in self.single and i not in covered]
+            out += [(i, i + n, " ".join(p)) for i in range(len(ws) - n + 1) if tuple(ws[i:i + n]) == p]
         return out
+
+    def hits(self, ws: list[str]) -> list[str]:
+        """The words and phrases of the list in ``ws``; a word inside a matched phrase
+        counts once, as the phrase."""
+        return [t for _, _, t in merge(self.spans(ws))]
+
+
+def merge(spans) -> list[tuple[int, int, str]]:
+    """Spans without overlaps, the longest first: one place in the text, one hit."""
+    out, taken = [], set()
+    for i, j, t in sorted(spans, key=lambda x: (x[0] - x[1], x[0])):
+        if not taken & set(range(i, j)):
+            out.append((i, j, t))
+            taken.update(range(i, j))
+    return sorted(out)
+
+
+@lru_cache(maxsize=None)
+def harmless(lang: str) -> frozenset[str]:
+    """Words that are on another language's list but ordinary in ``lang``."""
+    try:
+        text = files("unseenet_watchman").joinpath(f"wordlists/harmless-{lang}.txt").read_text("utf-8")
+    except FileNotFoundError:
+        return frozenset()
+    return frozenset(w for line in text.splitlines() if not line.startswith("#") for w in words(line))
 
 
 @lru_cache(maxsize=None)
@@ -117,14 +144,12 @@ class Rules:
 @dataclass
 class Verdict:
     hits: list[str]
-    lang: str | None         # the language the hits are from; None: not told
-    told: bool               # whether the language was told from the text
+    lang: str | None         # the post's language, told from its text; None: not told
 
     @property
     def why(self) -> str:
         n = len(self.hits)
-        where = f"{self.lang} list" if self.lang else "lists"
-        return f"{n} rude word{'s' if n != 1 else ''} ({where})"
+        return f"{n} rude word{'s' if n != 1 else ''}" + (f", {self.lang} text" if self.lang else "")
 
 
 def enough(n_hits: int, n_words: int, rules: Rules) -> bool:
@@ -140,12 +165,11 @@ def profanity(text: str, rules: Rules | None = None, author_tags=()) -> Verdict 
     if not ws:
         return None
     lang = language(ws)
-    if lang is not None:
-        hits = wordlist(lang).hits(ws)
-        return Verdict(hits, lang, True) if enough(len(hits), len(ws), rules) else None
-    best = None
-    for l in LANGS:                                   # each language on its own
-        hits = wordlist(l).hits(ws)
-        if enough(len(hits), len(ws), rules) and (best is None or len(hits) > len(best.hits)):
-            best = Verdict(hits, l, False)
-    return best
+    friends = harmless(lang) if lang else frozenset()
+    own = wordlist(lang) if lang else None
+    spans = []
+    for l in LANGS:
+        spans += [sp for sp in wordlist(l).spans(ws)
+                  if not (sp[1] - sp[0] == 1 and sp[2] in friends and (own is None or sp[2] not in own.single))]
+    hits = [t for _, _, t in merge(spans)]
+    return Verdict(hits, lang) if enough(len(hits), len(ws), rules) else None

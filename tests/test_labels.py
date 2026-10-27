@@ -63,3 +63,20 @@ async def test_queue_publish_and_take_back(tmp_path):
     assert published[1][0] == [("<m1@x>", "dk.snak@f", [])]     # [] takes it back
     assert "<m1@x>" not in st.labelled
     assert not labelling.check(m, st, labels.Rules(), log=lambda x: None)   # spared now
+
+
+def test_every_list_on_every_post():
+    # a Danish post with an English insult: the English list counts too
+    mixed = "Jeg synes bare at du er en idiot og fuck you your mother fucker, det er sådan det er"
+    v = labels.profanity(mixed)
+    assert v.lang == "da" and "mother fucker" in v.hits
+
+
+def test_false_friends_only_in_their_own_language():
+    assert "slut" in labels.harmless("da")
+    assert labels.profanity("You are such a slut and a bitch").hits == ["slut", "bitch"]
+
+
+def test_one_place_counts_once_across_lists():
+    # "fuck dig" is a Danish phrase; "fuck" alone is on several lists
+    assert labels.profanity("fuck dig").hits == ["fuck dig"]

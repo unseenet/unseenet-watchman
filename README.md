@@ -45,8 +45,14 @@ a reader chooses whether to follow the labeller and what to do with the label
 - **Word lists** per language - Danish, German, English - from
   [ovos-good-manners-pipeline-plugin](https://github.com/OpenVoiceOS/ovos-good-manners-pipeline-plugin)
   (Apache-2.0, see [NOTICE](NOTICE)); `contrib/update-wordlists.sh` fetches newer ones.
-- **The language first**: guessed from a post's common small words, and only that
-  language's list is used - "slut" is rude in English and means "end" in Danish.
+- **Every list on every post** - people mix languages, and a Danish post with an
+  English insult in it is ordinary. A place in the text counts once, however many
+  lists name it.
+- **The language only removes false friends**: told from a post's common small
+  words, it keeps a word that is ordinary in that language from counting - "slut" is
+  rude in English and means "end" in Danish (`wordlists/harmless-da.txt`). The
+  post's own language header is never used for this: anybody can declare Danish and
+  swear in English.
 - **Whole words and phrases only**, and a threshold: at least two in a post, or one
   in a post of at most eight words. One rude word in a long post is no reason to
   warn anybody.
