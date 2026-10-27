@@ -7,6 +7,11 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
+- **Labels: every list on every post** (#6): a Danish post with an English
+  insult was checked against the Danish list only. Now every list counts, a
+  place in the text once; the language (told from the text, never from the
+  post's language header) only keeps false friends like Danish "slut" from
+  counting (`wordlists/harmless-<lang>.txt`).
 - **Labeller** (#2): with `labels = true` a third key, *Unseenet watchman
   (labels)*, gives the warning label `profanity` (UN-RFC 0053) from the word
   lists of ovos-good-manners-pipeline-plugin (da, de, en). The language is
