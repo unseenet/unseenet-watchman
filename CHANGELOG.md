@@ -7,6 +7,12 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
+- **More than one DNS resolver** (#17): `doh` takes a list, tried in order - default
+  Google, Cloudflare and Quad9. A failed lookup (Tor's "SOCKS error 1", seen on node3) is
+  asked once more on a fresh circuit, then through the next resolver, instead of skipping
+  the blocklists. Each list's test point is looked up through each resolver, and a
+  resolver a list refuses - also silently - is not used for that list. One URL as before
+  still works.
 - **Releases** (#14): a release workflow - GitHub release and PyPI (trusted publishing),
   refusing to publish while the core is named by a git URL.
 - **The language from the core** (#13, unseenet#686): `words`, `language`, `detect` and

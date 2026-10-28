@@ -150,3 +150,93 @@ def test_key_only_after_repeated_findings():
     kc2 = decide.KeyCounter()
     kc2.add("k", 0, rules), kc2.add("k", 1, rules)
     assert not kc2.add("k", 8 * 86400, rules)          # the first two are out of the window
+
+
+G, C, Q = dnsbl.DEFAULT_DOHS
+SURBL_TEST = "surbl-org-permanent-test-point.com.multi.surbl.org"
+
+
+def test_doh_list_from_config():
+    assert dnsbl.doh_list("") == dnsbl.DEFAULT_DOHS
+    assert dnsbl.doh_list("https://x.example/resolve") == ["https://x.example/resolve"]
+    assert dnsbl.doh_list([C, "", Q]) == [C, Q]
+
+
+async def test_falls_back_to_the_next_resolver():
+    asked = []
+
+    async def resolve(q, r):
+        asked.append((q, r))
+        if r == G:
+            raise dnsbl.ResolveError("Tor could not reach dns.google (SOCKS error 1)")
+        return {SURBL_TEST: "127.0.0.254", "bad.example.multi.surbl.org": "127.0.0.64"}.get(q)
+
+    logs = []
+    lk = dnsbl.Lookups([dnsbl.SURBL], resolve, log=logs.append, resolvers=[G, C, Q])
+    hits = await lk.check("bad.example")
+    assert [h.reasons for h in hits] == [{"spam"}]
+    assert ("bad.example.multi.surbl.org", C) in asked
+    assert ("bad.example.multi.surbl.org", Q) not in asked           # C answered first
+    assert not any("skipped" in m for m in logs)
+
+
+async def test_a_resolver_refused_silently_is_not_used_for_that_zone():
+    asked = []
+
+    async def resolve(q, r):
+        asked.append((q, r))
+        if r == C:
+            return None                   # Cloudflare refused silently: "does not exist"
+        return {SURBL_TEST: "127.0.0.254"}.get(q)
+
+    logs = []
+    lk = dnsbl.Lookups([dnsbl.SURBL], resolve, log=logs.append, resolvers=[C, Q])
+    await lk.selftest(force=True)
+    assert lk.active() == [dnsbl.SURBL]
+    assert "cloudflare-dns.com" in logs[-1] and "not used" in logs[-1]
+    await lk.check("clean.example")
+    assert ("clean.example.multi.surbl.org", C) not in asked
+    assert ("clean.example.multi.surbl.org", Q) in asked
+
+
+async def test_a_zone_is_paused_only_when_no_resolver_passes():
+    async def resolve(q, r):
+        if r == G:
+            raise dnsbl.ResolveError("no answer")
+        return None
+
+    logs = []
+    lk = dnsbl.Lookups([dnsbl.SURBL], resolve, log=logs.append, resolvers=[G, C])
+    await lk.selftest(force=True)
+    assert lk.active() == []
+    assert "dns.google" in logs[-1] and "cloudflare-dns.com" in logs[-1] and "paused" in logs[-1]
+
+
+async def test_all_resolvers_failing_skips_the_lookup():
+    ok = True
+
+    async def resolve(q, r):
+        if ok:
+            return {SURBL_TEST: "127.0.0.254"}.get(q)
+        raise dnsbl.ResolveError(f"down: {r}")
+
+    logs = []
+    lk = dnsbl.Lookups([dnsbl.SURBL], resolve, log=logs.append, resolvers=[G, C])
+    await lk.selftest(force=True)
+    ok = False
+    assert await lk.check("x.example") == []
+    assert "skipped" in logs[-1] and G in logs[-1] and C in logs[-1]
+
+
+async def test_retry_asks_again_on_a_fresh_circuit(monkeypatch):
+    calls = []
+
+    async def fake(name, host, port, doh, timeout=45.0, isolate=""):
+        calls.append(isolate)
+        if not isolate:
+            raise dnsbl.ResolveError("SOCKS error 1")
+        return "127.0.0.254"
+
+    monkeypatch.setattr(dnsbl, "doh_resolve", fake)
+    assert await dnsbl.doh_resolve_retry("q", "127.0.0.1", 9050, G) == "127.0.0.254"
+    assert calls[0] == "" and calls[1].startswith("watchman-")

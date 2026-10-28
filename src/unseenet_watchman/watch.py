@@ -56,7 +56,7 @@ class Config:
     skip_groups: list[str] = field(default_factory=list)
     contact: str = ""
     tor_socks: str = ""           # "": the Tor the session uses; or host:port
-    doh: str = ""                 # the DNS-over-HTTPS resolver (dnsbl.DEFAULT_DOH)
+    doh: str | list[str] = ""     # DNS-over-HTTPS resolver(s), tried in order (dnsbl.DEFAULT_DOHS)
     spamhaus_dqs_key: str = ""    # turns Spamhaus DBL on, through its DQS zones
     rules: decide.Rules = field(default_factory=decide.Rules)
     zones: list[Zone] | None = None
@@ -342,9 +342,8 @@ def make_lookups(cfg: Config, s: Session | None = None, log=print) -> Lookups:
     """Lookups with DNS-over-HTTPS through ``tor_socks``, or - when it is empty -
     through the same Tor the session reads the nodes with (dnsbl explains why not
     plain DNS)."""
-    from .dnsbl import DEFAULT_DOH, ResolveError, default_zones, doh_resolve
+    from .dnsbl import ResolveError, default_zones, doh_list, doh_resolve_retry
     zones = cfg.zones if cfg.zones is not None else default_zones(cfg.spamhaus_dqs_key)
-    doh = cfg.doh or DEFAULT_DOH
 
     def socks() -> tuple[str, int]:
         if cfg.tor_socks:
@@ -357,7 +356,7 @@ def make_lookups(cfg: Config, s: Session | None = None, log=print) -> Lookups:
             return "127.0.0.1", s.tor.socks_port
         raise ResolveError("the session's Tor is not running yet")
 
-    async def resolve(q: str):
+    async def resolve(q: str, doh: str):
         host, port = socks()
-        return await doh_resolve(q, host, port, doh)
-    return Lookups(zones, resolve, log=log)
+        return await doh_resolve_retry(q, host, port, doh)
+    return Lookups(zones, resolve, log=log, resolvers=doh_list(cfg.doh))
