@@ -166,8 +166,11 @@ clean. The watchman therefore asks a **DNS-over-HTTPS** resolver *through* Tor;
 the resolver sees which domains are looked up - links in public posts - and a
 Tor exit, never the watchman.
 
-`doh` is a list of resolvers, tried in order (default Google, Cloudflare and
-Quad9). A lookup that fails - usually a bad exit or a circuit Tor could not
+`doh` is a list of resolvers, tried in order. The default is four that answered
+SURBL through Tor in October 2026: Google, Wikimedia DNS, AdGuard (unfiltered)
+and DNS.SB. Cloudflare answers SURBL with SERVFAIL, and Quad9 and Mullvad only
+speak HTTP/2, which the watchman does not. Requests are RFC 8484 wire format; a
+URL ending in `/resolve` is asked in Google's JSON format instead. A lookup that fails - usually a bad exit or a circuit Tor could not
 build - is asked once more on a fresh circuit, then through the next resolver.
 Only when all fail are the blocklists skipped for that post, and the log says so.
 

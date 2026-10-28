@@ -152,7 +152,8 @@ def test_key_only_after_repeated_findings():
     assert not kc2.add("k", 8 * 86400, rules)          # the first two are out of the window
 
 
-G, C, Q = dnsbl.DEFAULT_DOHS
+G, C, Q = ("https://dns.google/dns-query", "https://cloudflare-dns.com/dns-query",
+           "https://dns.quad9.net/dns-query")
 SURBL_TEST = "surbl-org-permanent-test-point.com.multi.surbl.org"
 
 
@@ -240,3 +241,36 @@ async def test_retry_asks_again_on_a_fresh_circuit(monkeypatch):
     monkeypatch.setattr(dnsbl, "doh_resolve", fake)
     assert await dnsbl.doh_resolve_retry("q", "127.0.0.1", 9050, G) == "127.0.0.254"
     assert calls[0] == "" and calls[1].startswith("watchman-")
+
+
+def test_dns_query_is_rfc1035():
+    q = dnsbl.dns_query("a.example.org")
+    assert q[:12] == bytes.fromhex("000001000001000000000000")
+    assert q[12:] == b"\x01a\x07example\x03org\x00\x00\x01\x00\x01"
+
+
+def _answer(rcode=0, address=None):
+    q = dnsbl.dns_query("x.multi.surbl.org")
+    head = bytearray(q[:12])
+    head[2], head[3] = 0x81, 0x80 | rcode
+    head[6:8] = (1 if address else 0).to_bytes(2, "big")
+    msg = bytes(head) + q[12:]
+    if address:   # a compressed name pointing at the question, then type A, IN, TTL, 4 bytes
+        msg += b"\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x3c\x00\x04" + bytes(address)
+    return msg
+
+
+def test_read_dns_message():
+    assert dnsbl.read_dns_message(_answer(address=[127, 0, 0, 254])) == "127.0.0.254"
+    assert dnsbl.read_dns_message(_answer(rcode=3)) is None          # NXDOMAIN
+    assert dnsbl.read_dns_message(_answer()) is None                 # no A record
+    with pytest.raises(dnsbl.ResolveError):
+        dnsbl.read_dns_message(_answer(rcode=2))                    # SERVFAIL
+    with pytest.raises(dnsbl.ResolveError):
+        dnsbl.read_dns_message(_answer(address=[127, 0, 0, 254])[:-6])   # cut off
+
+
+def test_wire_or_json_by_url():
+    assert dnsbl.uses_json("https://dns.google/resolve")
+    assert not dnsbl.uses_json("https://dns.google/dns-query")
+    assert all(not dnsbl.uses_json(r) for r in dnsbl.DEFAULT_DOHS)

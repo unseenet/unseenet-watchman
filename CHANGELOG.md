@@ -7,8 +7,11 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
-- **More than one DNS resolver** (#17): `doh` takes a list, tried in order - default
-  Google, Cloudflare and Quad9. A failed lookup (Tor's "SOCKS error 1", seen on node3) is
+- **DoH in RFC 8484 wire format** (#19): the blocklists are asked with plain DNS messages
+  (`?dns=`), which every DoH resolver speaks, not only Google's JSON API. The default list
+  is now Google, Wikimedia DNS, AdGuard (unfiltered) and DNS.SB - each answered SURBL's
+  test point through Tor. A URL ending in `/resolve` still uses JSON.
+- **More than one DNS resolver** (#17): `doh` takes a list, tried in order. A failed lookup (Tor's "SOCKS error 1", seen on node3) is
   asked once more on a fresh circuit, then through the next resolver, instead of skipping
   the blocklists. Each list's test point is looked up through each resolver, and a
   resolver a list refuses - also silently - is not used for that list. One URL as before
