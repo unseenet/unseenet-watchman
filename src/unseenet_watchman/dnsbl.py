@@ -21,12 +21,20 @@ What works through public DoH (tried October 2026): SURBL's ``multi.surbl.org``.
 Spamhaus refuses public resolvers - its free **DQS** key gives zones of its own
 (``<key>.dbl.dq.spamhaus.net``) that answer. URIBL refuses them too. Check each list's
 terms of use; several are free only for small, non-commercial use.
+
+**More than one resolver.** A lookup that fails (a bad exit, a circuit that could not
+be built) is asked once more on a fresh circuit, then through the next resolver in the
+list. Since lists refuse resolvers differently, the test point is looked up through
+*each* resolver: a resolver that fails it is not used for that zone, and a zone is only
+paused when no resolver passes - a fallback to a resolver a list refuses silently would
+otherwise make every domain look clean.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
+import secrets
 import ssl
 import time
 from dataclasses import dataclass, field
@@ -35,7 +43,23 @@ from urllib.parse import quote, urlsplit
 CACHE_SECONDS = 6 * 3600
 PAUSE_SECONDS = 3600
 SELFTEST_SECONDS = 6 * 3600
-DEFAULT_DOH = "https://dns.google/resolve"
+DEFAULT_DOHS = ["https://dns.google/resolve",              # all three answer DNS JSON
+                "https://cloudflare-dns.com/dns-query",
+                "https://dns.quad9.net:5053/dns-query"]
+DEFAULT_DOH = DEFAULT_DOHS[0]
+
+
+def doh_list(value) -> list[str]:
+    """``doh`` from the config: one URL, a list of them, or empty for the defaults."""
+    if not value:
+        return list(DEFAULT_DOHS)
+    if isinstance(value, str):
+        return [value]
+    return [str(v) for v in value if v]
+
+
+def doh_host(doh: str) -> str:
+    return urlsplit(doh).hostname or doh
 
 
 @dataclass
@@ -117,11 +141,25 @@ def read_dns_json(http: bytes) -> str | None:
     return None
 
 
-async def _socks_connect(reader, writer, host: str, port: int, timeout: float) -> None:
-    writer.write(b"\x05\x01\x00")
-    await writer.drain()
-    if await asyncio.wait_for(reader.readexactly(2), timeout) != b"\x05\x00":
-        raise ResolveError("Tor's SOCKS port refused the greeting")
+async def _socks_connect(reader, writer, host: str, port: int, timeout: float,
+                         isolate: str = "") -> None:
+    """SOCKS5 CONNECT. ``isolate``: a username for Tor's IsolateSOCKSAuth (on by
+    default), so a different one gets a different circuit."""
+    if isolate:
+        writer.write(b"\x05\x01\x02")
+        await writer.drain()
+        if await asyncio.wait_for(reader.readexactly(2), timeout) != b"\x05\x02":
+            raise ResolveError("Tor's SOCKS port refused the greeting")
+        u = isolate.encode()[:255]
+        writer.write(b"\x01" + bytes([len(u)]) + u + b"\x01x")
+        await writer.drain()
+        if (await asyncio.wait_for(reader.readexactly(2), timeout))[1] != 0:
+            raise ResolveError("Tor's SOCKS port refused the isolation username")
+    else:
+        writer.write(b"\x05\x01\x00")
+        await writer.drain()
+        if await asyncio.wait_for(reader.readexactly(2), timeout) != b"\x05\x00":
+            raise ResolveError("Tor's SOCKS port refused the greeting")
     h = host.encode("ascii")
     writer.write(b"\x05\x01\x00\x03" + bytes([len(h)]) + h + port.to_bytes(2, "big"))
     await writer.drain()
@@ -136,8 +174,18 @@ async def _socks_connect(reader, writer, host: str, port: int, timeout: float) -
         await reader.readexactly((await reader.readexactly(1))[0] + 2)
 
 
+async def doh_resolve_retry(name: str, socks_host: str, socks_port: int, doh: str = DEFAULT_DOH,
+                            timeout: float = 45.0) -> str | None:
+    """``doh_resolve``, asked once more on a fresh circuit when it fails."""
+    try:
+        return await doh_resolve(name, socks_host, socks_port, doh, timeout)
+    except ResolveError:
+        return await doh_resolve(name, socks_host, socks_port, doh, timeout,
+                                 isolate="watchman-" + secrets.token_hex(6))
+
+
 async def doh_resolve(name: str, socks_host: str, socks_port: int, doh: str = DEFAULT_DOH,
-                      timeout: float = 45.0) -> str | None:
+                      timeout: float = 45.0, isolate: str = "") -> str | None:
     """Resolve ``name`` (A) with a DNS-over-HTTPS resolver reached through Tor."""
     url = urlsplit(doh)
     host, port = url.hostname or "", url.port or 443
@@ -146,7 +194,7 @@ async def doh_resolve(name: str, socks_host: str, socks_port: int, doh: str = DE
     except (OSError, asyncio.TimeoutError) as exc:
         raise ResolveError(f"Tor at {socks_host}:{socks_port}: {exc}") from exc
     try:
-        await _socks_connect(reader, writer, host, port, timeout)
+        await _socks_connect(reader, writer, host, port, timeout, isolate)
         await asyncio.wait_for(writer.start_tls(ssl.create_default_context(), server_hostname=host), timeout)
         path = (url.path or "/resolve") + f"?name={quote(name)}&type=A"
         writer.write(f"GET {path} HTTP/1.1\r\nHost: {host}\r\nAccept: application/dns-json\r\n"
@@ -170,15 +218,25 @@ class Hit:
 class Lookups:
     """Lookups with a cache; zones paused when they refuse or fail their test point.
 
-    ``resolve(qname)`` returns an address or None; tests pass their own."""
+    ``resolve(qname)`` returns an address or None; tests pass their own. With
+    ``resolvers``, it is ``resolve(qname, resolver)``: they are tried in order, and
+    each zone uses only the resolvers that passed its test point."""
 
-    def __init__(self, zones: list[Zone], resolve, log=print):
+    def __init__(self, zones: list[Zone], resolve, log=print, resolvers: list[str] | None = None):
         self.zones = [z for z in zones if z.enabled]
         self.resolve = resolve
         self.log = log
+        self.resolvers: list[str | None] = list(resolvers) if resolvers else [None]
+        self._via: dict[str, list[str | None]] = {}
         self._cache: dict[str, tuple[float, str | None]] = {}
         self._paused: dict[str, float] = {}
         self._tested = 0.0
+
+    async def _call(self, qname: str, r: str | None):
+        return await (self.resolve(qname) if r is None else self.resolve(qname, r))
+
+    def _named(self, r: str | None, why: str) -> str:
+        return why if r is None or len(self.resolvers) == 1 else f"via {doh_host(r)}: {why}"
 
     def _pause(self, z: Zone, seconds: float, why: str) -> None:
         self._paused[z.name] = time.monotonic() + seconds
@@ -195,29 +253,50 @@ class Lookups:
         self._tested = time.monotonic()
         for z in self.zones:
             if not z.test:
+                self._via[z.name] = list(self.resolvers)
                 continue
-            try:
-                address = await self.resolve(f"{z.test}.{z.name}")
-            except ResolveError as exc:
-                self._pause(z, PAUSE_SECONDS, f"test lookup failed ({exc})")
-                continue
-            if address in z.refused:
-                self._pause(z, SELFTEST_SECONDS, f"refused the lookup ({address}) - "
-                            "a key for the list may be needed")
-            elif not address or not z.reasons(address):
-                self._pause(z, SELFTEST_SECONDS, f"did not list its own test point {z.test} "
-                            f"(answer: {address or 'none'}) - the resolver may be refused silently")
-            else:
+            passed: list[str | None] = []
+            failures: list[tuple[float, str]] = []
+            for r in self.resolvers:
+                try:
+                    address = await self._call(f"{z.test}.{z.name}", r)
+                except ResolveError as exc:
+                    failures.append((PAUSE_SECONDS, self._named(r, f"test lookup failed ({exc})")))
+                    continue
+                if address in z.refused:
+                    failures.append((SELFTEST_SECONDS, self._named(
+                        r, f"refused the lookup ({address}) - a key for the list may be needed")))
+                elif not address or not z.reasons(address):
+                    failures.append((SELFTEST_SECONDS, self._named(
+                        r, f"did not list its own test point {z.test} (answer: {address or 'none'})"
+                        " - the resolver may be refused silently")))
+                else:
+                    passed.append(r)
+            self._via[z.name] = passed
+            if passed:
                 self._paused.pop(z.name, None)
+                for _, why in failures:
+                    self.log(f"{z.name}: {why}; that resolver is not used for this list")
+            else:
+                # only lookups that failed outright: try again in an hour; a refusal: later
+                seconds = min(sec for sec, _ in failures)
+                self._pause(z, seconds, "; ".join(why for _, why in failures))
 
-    async def _ask(self, qname: str) -> str | None:
+    async def _ask(self, qname: str, z: Zone) -> str | None:
         now = time.monotonic()
         hit = self._cache.get(qname)
         if hit and now - hit[0] < CACHE_SECONDS:
             return hit[1]
-        address = await self.resolve(qname)
-        self._cache[qname] = (now, address)
-        return address
+        errors = []
+        for r in self._via.get(z.name, self.resolvers):
+            try:
+                address = await self._call(qname, r)
+            except ResolveError as exc:
+                errors.append(str(exc))
+                continue
+            self._cache[qname] = (now, address)
+            return address
+        raise ResolveError("; ".join(errors) or "no resolver passed the test point")
 
     async def check(self, domain: str) -> list[Hit]:
         """Each active zone that lists ``domain``, with its reasons."""
@@ -225,7 +304,7 @@ class Lookups:
         out = []
         for z in self.active():
             try:
-                address = await self._ask(f"{domain}.{z.name}")
+                address = await self._ask(f"{domain}.{z.name}", z)
             except ResolveError as exc:
                 self.log(f"blocklist lookups skipped: {exc}")
                 return out

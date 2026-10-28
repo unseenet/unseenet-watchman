@@ -18,7 +18,14 @@ skip_groups = ["unseenet.test*"] # e.g. groups where odd posts are the point
 # contact = "inbox@..."          # where to object; default: the issuer's own inbox
 # tor_socks = "127.0.0.1:9050"   # default: the Tor the watchman reads the nodes with;
                                  # every blocklist lookup goes through Tor either way
-# doh = "https://dns.google/resolve"   # the DNS-over-HTTPS resolver, reached through Tor
+# DNS-over-HTTPS resolvers for the blocklists, reached through Tor and tried in order:
+# a failed lookup is asked once more on a fresh circuit, then through the next one.
+# Each list's test point is looked up through each resolver, and a resolver a list
+# refuses (also silently) is not used for that list. Default: these three. One URL
+# alone (doh = "https://...") also works; any resolver that answers DNS JSON will do.
+# doh = ["https://dns.google/resolve",
+#        "https://cloudflare-dns.com/dns-query",
+#        "https://dns.quad9.net:5053/dns-query"]
 # spamhaus_dqs_key = "..."       # turns Spamhaus DBL on (its free DQS key)
 
 # Also a labeller (UN-RFC 0053): the warning label "profanity", from word lists per

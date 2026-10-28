@@ -162,14 +162,21 @@ elsewhere, over Tor.
 A URI blocklist is a DNS zone that answers with a 127.0.0.x address when a
 domain is listed. **Tor drops such answers** when it resolves a name itself -
 a safety rule of the Tor client - so through plain DNS every domain would look
-clean. The watchman therefore asks a **DNS-over-HTTPS** resolver *through* Tor
-(`doh`, default Google's); the resolver sees which domains are looked up -
-links in public posts - and a Tor exit, never the watchman.
+clean. The watchman therefore asks a **DNS-over-HTTPS** resolver *through* Tor;
+the resolver sees which domains are looked up - links in public posts - and a
+Tor exit, never the watchman.
+
+`doh` is a list of resolvers, tried in order (default Google, Cloudflare and
+Quad9). A lookup that fails - usually a bad exit or a circuit Tor could not
+build - is asked once more on a fresh circuit, then through the next resolver.
+Only when all fail are the blocklists skipped for that post, and the log says so.
 
 Lists refuse big public resolvers, sometimes silently with "does not exist".
 So each list has a **test point**, a domain it always lists, looked up at start
-and every 6 hours: a list that does not list its own test point is paused, and
-the log says why. What that showed in October 2026:
+and every 6 hours, through each resolver. A resolver that fails it is not used
+for that list; a list is paused only when no resolver passes, and the log says
+why. So a fallback can never be a resolver that silently makes every domain
+look clean. What that showed in October 2026:
 
 | List | Through public DoH | Default |
 |---|---|---|
