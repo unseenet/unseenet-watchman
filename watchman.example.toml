@@ -21,11 +21,14 @@ skip_groups = ["unseenet.test*"] # e.g. groups where odd posts are the point
 # DNS-over-HTTPS resolvers for the blocklists, reached through Tor and tried in order:
 # a failed lookup is asked once more on a fresh circuit, then through the next one.
 # Each list's test point is looked up through each resolver, and a resolver a list
-# refuses (also silently) is not used for that list. Default: these three. One URL
-# alone (doh = "https://...") also works; any resolver that answers DNS JSON will do.
-# doh = ["https://dns.google/resolve",
-#        "https://cloudflare-dns.com/dns-query",
-#        "https://dns.quad9.net:5053/dns-query"]
+# refuses (also silently) is not used for that list. Default: these four, which all
+# answered SURBL through Tor in October 2026. One URL alone (doh = "https://...") also
+# works. Any RFC 8484 resolver on port 443 that speaks HTTP/1.1 will do; a path ending
+# in /resolve is asked in Google's JSON format instead.
+# doh = ["https://dns.google/dns-query",
+#        "https://wikimedia-dns.org/dns-query",
+#        "https://unfiltered.adguard-dns.com/dns-query",
+#        "https://doh.dns.sb/dns-query"]
 # spamhaus_dqs_key = "..."       # turns Spamhaus DBL on (its free DQS key)
 
 # Also a labeller (UN-RFC 0053): the warning label "profanity", from word lists per

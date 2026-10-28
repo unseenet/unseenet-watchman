@@ -10,6 +10,8 @@ real network. Every blocklist answer is such an address, so that way every domai
 look clean. Instead the watchman asks a **DNS-over-HTTPS** resolver, through Tor: the
 answer is then HTTP content, which Tor does not look into. The resolver learns which
 domains are looked up - links in public posts - and a Tor exit's address, never ours.
+The request is RFC 8484 wire format, which every DoH resolver speaks on port 443;
+Google's ``/resolve`` JSON API is still understood for configs that name it.
 
 **Refusals.** Lists refuse lookups from big public resolvers, in two ways: with an
 error code (``refused`` in a zone's config), or silently, answering "does not exist".
@@ -33,6 +35,7 @@ otherwise make every domain look clean.
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import secrets
 import ssl
@@ -43,9 +46,12 @@ from urllib.parse import quote, urlsplit
 CACHE_SECONDS = 6 * 3600
 PAUSE_SECONDS = 3600
 SELFTEST_SECONDS = 6 * 3600
-DEFAULT_DOHS = ["https://dns.google/resolve",              # all three answer DNS JSON
-                "https://cloudflare-dns.com/dns-query",
-                "https://dns.quad9.net:5053/dns-query"]
+# Each answered SURBL's test point through Tor, over HTTP/1.1, in October 2026.
+# Cloudflare answers SURBL with SERVFAIL; Quad9 and Mullvad want HTTP/2.
+DEFAULT_DOHS = ["https://dns.google/dns-query",
+                "https://wikimedia-dns.org/dns-query",
+                "https://unfiltered.adguard-dns.com/dns-query",
+                "https://doh.dns.sb/dns-query"]
 DEFAULT_DOH = DEFAULT_DOHS[0]
 
 
@@ -110,9 +116,8 @@ class ResolveError(OSError):
     """The resolver could not be asked or did not answer (Tor down, resolver failing)."""
 
 
-def read_dns_json(http: bytes) -> str | None:
-    """The first A record in an HTTP response with DNS JSON; None for "does not exist".
-    ResolveError for anything else (an HTTP error, SERVFAIL ...)."""
+def http_body(http: bytes) -> bytes:
+    """The body of a 200 response (chunked or not); ResolveError for any other status."""
     head, _, body = http.partition(b"\r\n\r\n")
     status_line = head.split(b"\r\n", 1)[0].split()
     if len(status_line) < 2 or status_line[1] != b"200":
@@ -126,6 +131,64 @@ def read_dns_json(http: bytes) -> str | None:
                 break
             out, body = out + rest[:n], rest[n + 2:]
         body = out
+    return body
+
+
+def dns_query(name: str) -> bytes:
+    """A DNS message asking for ``name``'s A record (RFC 1035), ID 0 as RFC 8484 asks."""
+    q = b"".join(bytes([len(label)]) + label for label in name.rstrip(".").encode("ascii").split(b"."))
+    return (b"\x00\x00\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00"   # ID 0, RD, 1 question
+            + q + b"\x00\x00\x01\x00\x01")                         # root, type A, class IN
+
+
+def _skip_name(msg: bytes, i: int) -> int:
+    while True:
+        if i >= len(msg):
+            raise ResolveError("resolver sent a cut-off DNS message")
+        n = msg[i]
+        if n & 0xC0 == 0xC0:                     # a pointer ends the name
+            return i + 2
+        if n == 0:
+            return i + 1
+        i += 1 + n
+
+
+def read_dns_message(msg: bytes) -> str | None:
+    """The first A record in a DNS message; None for "does not exist" or no A record.
+    ResolveError for SERVFAIL, REFUSED and anything malformed."""
+    if len(msg) < 12:
+        raise ResolveError("resolver sent a cut-off DNS message")
+    rcode = msg[3] & 0x0F
+    if rcode == 3:
+        return None                                 # NXDOMAIN: not listed
+    if rcode != 0:
+        raise ResolveError(f"resolver status {rcode}")
+    qd, an = int.from_bytes(msg[4:6], "big"), int.from_bytes(msg[6:8], "big")
+    i = 12
+    for _ in range(qd):
+        i = _skip_name(msg, i) + 4
+    for _ in range(an):
+        i = _skip_name(msg, i)
+        if i + 10 > len(msg):
+            raise ResolveError("resolver sent a cut-off DNS message")
+        rtype = int.from_bytes(msg[i:i + 2], "big")
+        rdlen = int.from_bytes(msg[i + 8:i + 10], "big")
+        rdata = msg[i + 10:i + 10 + rdlen]
+        if rtype == 1 and len(rdata) == 4:
+            return ".".join(str(b) for b in rdata)
+        i += 10 + rdlen
+    return None
+
+
+def uses_json(doh: str) -> bool:
+    """Google's ``/resolve`` speaks DNS JSON; everything else RFC 8484 wire format."""
+    return urlsplit(doh).path.rstrip("/").endswith("/resolve")
+
+
+def read_dns_json(http: bytes) -> str | None:
+    """The first A record in an HTTP response with DNS JSON; None for "does not exist".
+    ResolveError for anything else (an HTTP error, SERVFAIL ...)."""
+    body = http_body(http)
     try:
         d = json.loads(body)
     except ValueError as exc:
@@ -196,11 +259,16 @@ async def doh_resolve(name: str, socks_host: str, socks_port: int, doh: str = DE
     try:
         await _socks_connect(reader, writer, host, port, timeout, isolate)
         await asyncio.wait_for(writer.start_tls(ssl.create_default_context(), server_hostname=host), timeout)
-        path = (url.path or "/resolve") + f"?name={quote(name)}&type=A"
-        writer.write(f"GET {path} HTTP/1.1\r\nHost: {host}\r\nAccept: application/dns-json\r\n"
+        if uses_json(doh):
+            path, accept = url.path + f"?name={quote(name)}&type=A", "application/dns-json"
+        else:
+            dns = base64.urlsafe_b64encode(dns_query(name)).rstrip(b"=").decode()
+            path, accept = (url.path or "/dns-query") + f"?dns={dns}", "application/dns-message"
+        writer.write(f"GET {path} HTTP/1.1\r\nHost: {host}\r\nAccept: {accept}\r\n"
                      "Connection: close\r\n\r\n".encode())
         await writer.drain()
-        return read_dns_json(await asyncio.wait_for(reader.read(-1), timeout))
+        http = await asyncio.wait_for(reader.read(-1), timeout)
+        return read_dns_json(http) if uses_json(doh) else read_dns_message(http_body(http))
     except (asyncio.IncompleteReadError, asyncio.TimeoutError, ssl.SSLError, ConnectionError) as exc:
         raise ResolveError(f"no answer from {host}: {exc!r}") from exc
     finally:
