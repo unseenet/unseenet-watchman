@@ -25,9 +25,9 @@ jobs:
       test: |
         set -eux
         docker run --rm "$TEST_IMAGE" --version
-        docker volume create t
-        docker run --rm -v t:/data "$TEST_IMAGE" && exit 1 || test $? -eq 64     # example config written
-        docker run --rm -v t:/data -e UNSEENET_VAULT_PASSPHRASE=ci "$TEST_IMAGE" init
-        docker run --rm -v t:/data -e UNSEENET_VAULT_PASSPHRASE=ci "$TEST_IMAGE" status
+        docker volume create ci
+        docker run --rm -v ci:/data "$TEST_IMAGE" && exit 1 || test $? -eq 64     # example config written
+        docker run --rm -v ci:/data -e UNSEENET_VAULT_PASSPHRASE=ci "$TEST_IMAGE" init
+        docker run --rm -v ci:/data -e UNSEENET_VAULT_PASSPHRASE=ci "$TEST_IMAGE" status
         docker run --rm "$TEST_IMAGE" python3 -c "import lingua"                  # [lingua] is in
-        test "$(docker run --rm -v t:/data "$TEST_IMAGE" sh -c 'id -u')" = 10001
+        test "$(docker run --rm -v ci:/data "$TEST_IMAGE" sh -c 'id -u')" = 10001
