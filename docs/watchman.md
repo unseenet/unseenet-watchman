@@ -35,3 +35,22 @@ then choose whose they follow. See the
 [README](https://github.com/unseenet/unseenet-watchman#run-it) for
 installing it, the config and the blocklists' terms. Start with
 `publish = false`, read what it would have reported, and only then publish.
+
+## In Docker
+
+`ghcr.io/unseenet/watchman` has the watchman with `[lingua]`, the core and Tor,
+for amd64 and arm64, published for releases only and signed with cosign. The
+vault, `watchman.toml` and the state are in the volume at `/data`; the vault's
+passphrase comes from a Docker secret (`unseenet_vault_passphrase`),
+`UNSEENET_VAULT_PASSPHRASE_FILE` or `UNSEENET_VAULT_PASSPHRASE`.
+
+```sh
+docker run --rm -v watchman:/data ghcr.io/unseenet/watchman            # writes an example watchman.toml
+docker run --rm -it -v watchman:/data -e UNSEENET_VAULT_PASSPHRASE=... ghcr.io/unseenet/watchman init
+docker run -d --name watchman -v watchman:/data -e UNSEENET_VAULT_PASSPHRASE=... ghcr.io/unseenet/watchman
+```
+
+With [`compose.yaml`](https://github.com/unseenet/unseenet-watchman/blob/main/compose.yaml)
+it runs beside a node in the same project (`nodes = ["node:1119"]`), with a
+read-only root file system. As beside any hidden node, running it there ties the
+two together by uptime (the README says more).

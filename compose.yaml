@@ -1,0 +1,28 @@
+# unseenet-watchman with Docker Compose (docs: "In Docker").
+#
+#   docker compose run --rm watchman          # first time: writes /data/watchman.toml
+#   docker compose run --rm watchman init     # the vault and both issuers' keys
+#   docker compose up -d
+#
+# Beside a node in the same project, read it directly: nodes = ["node:1119"] in
+# watchman.toml. Blocklists are always asked through Tor.
+services:
+  watchman:
+    image: ghcr.io/unseenet/watchman:latest
+    restart: unless-stopped
+    volumes:
+      - watchman:/data             # watchman.toml, the vault, state
+    secrets:
+      - unseenet_vault_passphrase
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, FOWNER, DAC_OVERRIDE]
+    security_opt: [no-new-privileges:true]
+
+volumes:
+  watchman:
+
+secrets:
+  unseenet_vault_passphrase:
+    file: ./vault-passphrase.txt

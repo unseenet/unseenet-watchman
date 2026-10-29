@@ -20,6 +20,10 @@ nothing is ever removed from the network.
   project's watchman runs at 4.
 - **How far each group was read is the core's** (unseenet#735): the session keeps it now;
   marks a watchman kept itself are handed over once at start.
+- **A container image** (#15): `ghcr.io/unseenet/watchman` with `[lingua]`, the vault,
+  config and state in `/data`, the passphrase as a Docker secret, and a `compose.yaml`
+  for running it beside a node. Published for amd64 and arm64 only for release tags,
+  through the project's shared workflow (unseenet/unseenet#571).
 
 - **DoH in RFC 8484 wire format** (#19): the blocklists are asked with plain DNS messages
   (`?dns=`), which every DoH resolver speaks, not only Google's JSON API. The default list
