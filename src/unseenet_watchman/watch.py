@@ -62,6 +62,7 @@ class Config:
     zones: list[Zone] | None = None
     labels: bool = False          # also a labeller (UN-RFC 0053): profanity
     label_rules: LabelRules = field(default_factory=LabelRules)
+    ripen_to: int | None = None      # the issuers' level (#21); else UNSEENET_RIPEN_TO, else 3
 
 
 # Key-bound groups that others write in: comments under a feed's posts (UN-RFC 0034)
@@ -92,19 +93,20 @@ def acting(s: Session, name: str):
 
 
 def remember_high(s: Session, st: State, gid: str) -> None:
-    """Keep how far a group was read in our state: with ``keep=False`` the session keeps
-    it in memory only (unseenet/unseenet#669), so a restart would read it all again."""
-    high = getattr(s, "_high", {}).get(gid)
-    if high:
-        st.high[gid] = high
+    """Nothing to do since unseenet 0.6: the session keeps how far each ``keep=False``
+    group was read in the vault itself (unseenet/unseenet#735)."""
 
 
 def restore_high(s: Session, st: State) -> None:
-    """At start: where each group got to, from our state."""
-    h = getattr(s, "_high", None)
-    if h is not None:
-        for gid, n in st.high.items():
-            h[gid] = max(h.get(gid, 0), n)
+    """At start, once: marks a watchman before 0.1.0 kept in its own state go to the
+    session, which keeps them from then on (``Session.set_read_marks``, unseenet#735)."""
+    if not st.high:
+        return
+    have = s.read_marks()
+    s.set_read_marks({gid: {"node": s.node_for(gid), "high": n}
+                      for gid, n in st.high.items() if gid not in have})
+    st.high.clear()
+    st.save()
 
 
 def own_keys(s: Session) -> set[str]:

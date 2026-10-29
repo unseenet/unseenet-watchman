@@ -7,6 +7,20 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-29
+
+**The first stable release, on unseenet 0.6** (`unseenet>=0.6.1,<0.7`; 0.6.1 because its
+nodes pull again, unseenet#748). The project's automatic spam-report issuers and
+labeller (UN-RFC 0045, 0053): signed reports and labels that readers choose to follow -
+nothing is ever removed from the network.
+
+- **Ripening to the level you choose** (#21, unseenet#740): the issuers' and the
+  labeller's keys ripen in the background to `ripen_to` under `[watchman]`, else
+  `UNSEENET_RIPEN_TO`, else level 3 - by name, so the watching goes on meanwhile. The
+  project's watchman runs at 4.
+- **How far each group was read is the core's** (unseenet#735): the session keeps it now;
+  marks a watchman kept itself are handed over once at start.
+
 - **DoH in RFC 8484 wire format** (#19): the blocklists are asked with plain DNS messages
   (`?dns=`), which every DoH resolver speaks, not only Google's JSON API. The default list
   is now Google, Wikimedia DNS, AdGuard (unfiltered) and DNS.SB - each answered SURBL's
@@ -75,3 +89,6 @@ All notable changes to unseenet-watchman are listed here. The format follows
   127.0.0.x, which is every blocklist answer, so lookups go to a DoH resolver
   through Tor. Each list has a test point checked every 6 hours; a list that
   fails it is paused. SURBL on by default, Spamhaus DBL with a DQS key, URIBL off.
+
+[Unreleased]: https://github.com/unseenet/unseenet-watchman/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/unseenet/unseenet-watchman/releases/tag/v0.1.0

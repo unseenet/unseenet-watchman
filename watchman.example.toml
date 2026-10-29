@@ -12,6 +12,9 @@ state_file = "~/.local/state/unseenet-watchman/state.json"
 # log: every batch is written there as the report it would have been.
 publish = false
 sweep_minutes = 60               # a full look now and then; new posts come by push
+# ripen_to = 4                   # the issuers' keys' ripening level (UN-RFC 0025); default
+                                 # UNSEENET_RIPEN_TO, else 3. 4: two to three weeks of one core,
+                                 # then every report costs about a quarter of the postage
 batch_minutes = 60               # how often it publishes what it found
 groups = ["*"]                   # group names to read (patterns, the part before @)
 skip_groups = ["unseenet.test*"] # e.g. groups where odd posts are the point

@@ -12,9 +12,7 @@ license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Andreas Lorensen" }]
 requires-python = ">=3.11"
 dependencies = [
-    # Spam reports (UN-RFC 0045) arrive with core 0.6.0; until it is released, main.
-    # Then: "unseenet>=0.6,<0.7" - one minor version of the core at a time.
-    "unseenet @ git+https://github.com/unseenet/unseenet@main",
+    "unseenet>=0.6.1,<0.7",   # one minor version of the core at a time; 0.6.1: pulls (#748)
 ]
 
 [project.optional-dependencies]
