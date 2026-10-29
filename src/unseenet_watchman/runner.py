@@ -85,7 +85,8 @@ def load_config(path: str | Path) -> Config:
             zones=_zones(d["zone"]) if "zone" in d else None,
             labels=bool(w.get("labels", False)),
             label_rules=labels.Rules(min_hits=int(d.get("labels", {}).get("min_hits", 2)),
-                                     short_words=int(d.get("labels", {}).get("short_words", 8))))
+                                     short_words=int(d.get("labels", {}).get("short_words", 8))),
+            ripen_to=int(w["ripen_to"]) if "ripen_to" in w else None)
     except KeyError as exc:
         raise SystemExit(f"{path}: missing {exc}") from exc
 
@@ -152,6 +153,29 @@ def is_local(address: str) -> bool:
     return not address.split(":")[0].endswith(".onion")
 
 
+async def ripen_issuers(s, cfg: Config, log) -> None:
+    """Ripen the issuers' and the labeller's keys, one after the other, to ``ripen_to``,
+    else ``UNSEENET_RIPEN_TO``, else 3 (#21, unseenet#740), publishing each new level.
+    By name, without act_as, so the watching goes on meanwhile; weeks for level 4."""
+    from unseenet.client.runtime import service_ripen_to
+    from unseenet.core import ripening as rp
+    if not rp.available():
+        return
+    to = service_ripen_to(cfg.ripen_to)
+    for name in [*ISSUERS, labelling.NAME]:
+        if name not in s.data.get("identities", {}):
+            continue
+        try:
+            while (lv := s.ripening(name).level) is None or lv < to:
+                if not await s.ripen_segment(name):
+                    break
+                if s.ripening(name).level != s.published_level(name):
+                    await s.publish_ripening(name)
+                    log(f"{name}: key ripened to level {s.ripening(name).level}")
+        except Exception as exc:  # noqa: BLE001 - posting still ripens what it needs
+            log(f"ripening {name} stopped: {exc}")
+
+
 async def cmd_run(cfg: Config, once: bool, dry_run: bool) -> None:
     from .follow import Follower
     log = lambda msg: print(f"{datetime.now():%Y-%m-%d %H:%M:%S} {msg}", flush=True)  # noqa: E731
@@ -177,7 +201,12 @@ async def cmd_run(cfg: Config, once: bool, dry_run: bool) -> None:
                 await publish(s, st, cfg, dry, log)
             st.save()
             return
-        await Follower(s, cfg, st, lookups, dry, log).run()
+        ripening = None if dry else asyncio.create_task(ripen_issuers(s, cfg, log))
+        try:
+            await Follower(s, cfg, st, lookups, dry, log).run()
+        finally:
+            if ripening is not None:
+                ripening.cancel()
     finally:
         await s.close()                  # its connections, and its own Tor if it started one
 

@@ -85,7 +85,7 @@ async def test_first_look_leaves_earlier_posts_alone(tmp_path):
     s = FakeSession({"dk.snak@f": [msg(1, "dk.snak@f", "ed25519:a", SPAM)]})
     st, c = State(tmp_path / "state.json"), cfg(tmp_path)
     assert await watch.look(s, c, st, lookups(), log=lambda m: None) == 0
-    assert not st.fresh and not st.pending and st.high == {"dk.snak@f": 1}   # remembered
+    assert not st.fresh and not st.pending       # how far: kept by the session (core #735)
     s.groups["dk.snak@f"].append(msg(2, "dk.snak@f", "ed25519:b", SPAM))
     await watch.look(s, c, st, lookups(), log=lambda m: None)
     assert [p.message_id for p in st.pending] == ["<m2@x>"]      # only what came after
@@ -155,10 +155,54 @@ def test_state_round_trip(tmp_path):
     assert not back.fresh and back.pending[0].message_id == "<a@x>" and "<b@x>" in back.spared
 
 
-def test_restore_high_after_a_restart(tmp_path):
+def test_marks_from_before_go_to_the_session_once(tmp_path):
+    """unseenet#735: the session keeps how far it read; a watchman's own old marks are
+    handed over once, for groups the session has none for, and then dropped."""
     st = State(tmp_path / "s.json")
-    st.high = {"g@f": 42}
-    s = FakeSession({})
-    s._high = {"g@f": 7}
-    watch.restore_high(s, st)
-    assert s._high == {"g@f": 42}
+    st.high = {"g@f": 42, "h@f": 5}
+    handed = {}
+
+    class S:
+        def read_marks(self):
+            return {"h@f": {"node": "n", "high": 9}}
+
+        def node_for(self, gid):
+            return "n"
+
+        def set_read_marks(self, marks):
+            handed.update(marks)
+    watch.restore_high(S(), st)
+    assert handed == {"g@f": {"node": "n", "high": 42}}
+    assert st.high == {}
+    watch.restore_high(S(), st)                         # nothing left to hand over
+    assert handed == {"g@f": {"node": "n", "high": 42}}
+
+
+def test_issuers_ripen_to_the_configured_level(tmp_path, monkeypatch):
+    """#21: each issuer and the labeller, by name, to ripen_to / UNSEENET_RIPEN_TO / 3."""
+    import asyncio
+    from unseenet.core import ripening as rp
+    from unseenet_watchman import runner
+    monkeypatch.setattr(rp, "available", lambda: True)
+    levels, published = {}, []
+
+    class S:
+        data = {"identities": {n: {} for n in [*watch.ISSUERS, "labels"]}}
+
+        def ripening(self, name):
+            return type("C", (), {"level": levels.get(name)})()
+
+        def published_level(self, name):
+            return None
+
+        async def ripen_segment(self, name):
+            levels[name] = (levels.get(name) if levels.get(name) is not None else -1) + 1
+            return True
+
+        async def publish_ripening(self, name):
+            published.append((name, levels[name]))
+    c = cfg(tmp_path)
+    c.ripen_to = 2
+    asyncio.run(runner.ripen_issuers(S(), c, log=lambda m: None))
+    assert all(levels[n] == 2 for n in watch.ISSUERS)
+    assert (next(iter(watch.ISSUERS)), 2) in published
