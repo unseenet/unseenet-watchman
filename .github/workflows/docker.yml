@@ -1,0 +1,33 @@
+name: docker
+# ghcr.io/unseenet/watchman (Dockerfile, docs "In Docker"): published for release tags
+# only - never on every merge - through the shared workflow (unseenet/unseenet#571);
+# a pull request that changes the image only builds and tests it.
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths: ["Dockerfile", "docker/**", "compose.yaml", ".github/workflows/docker.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    uses: unseenet/.github/.github/workflows/docker-image.yml@main
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    with:
+      image: ghcr.io/unseenet/watchman
+      test: |
+        set -eux
+        docker run --rm "$TEST_IMAGE" --version
+        docker volume create t
+        docker run --rm -v t:/data "$TEST_IMAGE" && exit 1 || test $? -eq 64     # example config written
+        docker run --rm -v t:/data -e UNSEENET_VAULT_PASSPHRASE=ci "$TEST_IMAGE" init
+        docker run --rm -v t:/data -e UNSEENET_VAULT_PASSPHRASE=ci "$TEST_IMAGE" status
+        docker run --rm "$TEST_IMAGE" python3 -c "import lingua"                  # [lingua] is in
+        test "$(docker run --rm -v t:/data "$TEST_IMAGE" sh -c 'id -u')" = 10001
