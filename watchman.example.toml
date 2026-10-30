@@ -39,6 +39,11 @@ skip_groups = ["unseenet.test*"] # e.g. groups where odd posts are the point
 # a dry run until publish = true.
 labels = false
 
+# Read the page behind a post's link card over Tor and report the post as phishing when
+# the card's title has nothing in common with it (UN-RFC 0059 section 11). Each card is
+# a fetch over Tor; off by default.
+cards = false
+
 [labels]
 min_hits = 2         # rude words or phrases in a post for the label ...
 short_words = 8      # ... or one, in a post of at most this many words

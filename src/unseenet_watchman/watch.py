@@ -25,7 +25,7 @@ from unseenet.client.session import Session, SessionError
 from unseenet.core.groups import KIND_REACTION, is_key_bound
 from unseenet.core.reports import MAX_ENTRIES
 
-from . import decide, dupes, labelling, uris
+from . import cards, decide, dupes, labelling, uris
 from .labels import Rules as LabelRules
 from .dnsbl import Lookups, Zone
 from .state import State
@@ -61,6 +61,7 @@ class Config:
     rules: decide.Rules = field(default_factory=decide.Rules)
     zones: list[Zone] | None = None
     labels: bool = False          # also a labeller (UN-RFC 0053): profanity
+    cards: bool = False           # compare link cards with their pages over Tor (#27)
     label_rules: LabelRules = field(default_factory=LabelRules)
     ripen_to: int | None = None      # the issuers' level (#21); else UNSEENET_RIPEN_TO, else 3
 
@@ -126,6 +127,11 @@ async def check_post(m, lookups: Lookups, st: State, cfg: Config, now: float) ->
                 break
         if found:
             break
+    pages = getattr(lookups, "card_pages", None)
+    if cfg.cards and pages is not None and not found:
+        why = await cards.check(m, pages)             # UN-RFC 0059 section 11
+        if why:
+            found.append(decide.Finding(m.message_id, m.group, m.author_key, "phishing", why))
     fp = dupes.fingerprint(m.body)
     if fp is not None:
         e = dupes.Entry(fp, m.message_id, m.group, m.author_key, now)
@@ -361,4 +367,18 @@ def make_lookups(cfg: Config, s: Session | None = None, log=print) -> Lookups:
     async def resolve(q: str, doh: str):
         host, port = socks()
         return await doh_resolve_retry(q, host, port, doh)
-    return Lookups(zones, resolve, log=log, resolvers=doh_list(cfg.doh))
+    lk = Lookups(zones, resolve, log=log, resolvers=doh_list(cfg.doh))
+    if cfg.cards:
+        lk.card_pages = cards.Pages(_page_fetch(socks), log=log)
+    return lk
+
+
+def _page_fetch(socks):
+    """A link card's page made over Tor, without its picture (core ``fetch_card``)."""
+    async def fetch(url: str):
+        from unseenet.client.session import fetch_card
+        host, port = socks()
+        if host not in ("127.0.0.1", "localhost", "::1"):
+            raise OSError("pages are read only through a local Tor")
+        return await fetch_card(url, port, picture=False)
+    return fetch

@@ -84,6 +84,7 @@ def load_config(path: str | Path) -> Config:
                 allow_domains=frozenset(d.lower() for d in r.get("allow_domains", []))),
             zones=_zones(d["zone"]) if "zone" in d else None,
             labels=bool(w.get("labels", False)),
+            cards=bool(w.get("cards", False)),
             label_rules=labels.Rules(min_hits=int(d.get("labels", {}).get("min_hits", 2)),
                                      short_words=int(d.get("labels", {}).get("short_words", 8))),
             ripen_to=int(w["ripen_to"]) if "ripen_to" in w else None)

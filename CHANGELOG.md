@@ -7,6 +7,14 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Deceptive link cards** (#27, UN-RFC 0059 section 11; needs unseenet with `fetch_card`,
+  unseenet#797): with `cards = true`, the page behind a post's link card is read over Tor
+  and the post reported as phishing when the card's title has nothing in common with the
+  page's title, description or site name. Never for short titles, pages without a title,
+  or cookie walls and challenges; each link read once a day at most. Off by default.
+
 ## [0.1.0] - 2026-10-29
 
 **The first stable release, on unseenet 0.6** (`unseenet>=0.6.1,<0.7`; 0.6.1 because its

@@ -192,6 +192,19 @@ non-commercial use. The lists, their answer codes and test points are in the
 config (`[[zone]]`), so a list that changes is a config change, not a release.
 `check` shows which lists answer before it checks a text.
 
+### Deceptive link cards
+
+A post can carry a preview of a link, a link card
+([UN-RFC 0059](https://unseenet.org/spec/un-rfc-0059/)), whose title and
+description are the poster's. With `cards = true` the watchman reads the
+linked page over Tor itself (without its picture) and reports the post as
+**phishing** when the card's title has nothing in common with the page: not a
+word of four letters or more of the page's title, description or site name.
+Careful on purpose: a card title of under three words, a page that gives no
+title, or a cookie wall, captcha or error page instead of the page is never
+reported. Each link is read once a day at most. Off by default - each card is
+a fetch over Tor.
+
 ## How it works
 
 - **Built on the core.** An ordinary Unseenet client on
