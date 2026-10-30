@@ -152,14 +152,14 @@ def test_a_mentioned_word_does_not_count(text):
 
 
 def test_a_longer_quotation_is_reported_speech_and_counts():
-    assert "profanity" in kinds('Then he said "fuck you all, I am leaving now" and he left the room')
+    assert "profanity" in kinds('Then he said "fuck you all, I am leaving this shit now" and he left the room')
 
 
 @pytest.mark.parametrize("text,hit", [
     ("Hvad fanden er det her for en f u c k i n g opdatering", "fucking"),
     ("What is this sh1t, honestly, and why is all this crap here", "shit (sh1t)"),
-    ("That is just fuuuuck, and so much more of it", "fuck (fuuuuck)"),
-    ("This f*ck thing again, and who wrote it", "fuck (f*ck)"),
+    ("That is just fuuuuck, and so much more of this crap", "fuck (fuuuuck)"),
+    ("This f*ck thing again, and who wrote this crap", "fuck (f*ck)"),
     ("Sikke et lortesystem, og det er noget lort", "lorte (in lortesystem)"),
     ("Das ist mir scheißegal, verdammt noch mal, sagte er", "scheiße (in scheißegal)"),
 ])
@@ -185,12 +185,11 @@ def test_weights_strong_and_mild():
     assert labels.wordlist("sexual", "da").weight("kneppe") == labels.STRONG
     assert labels.wordlist("sexual", "da").weight("porno") == labels.MILD
     long_one = "Det er en lang tekst om vejret og om hvad vi skal i morgen tidlig. "
-    assert labels.profanity(long_one + "Fuck.") is not None              # one strong word
-    assert labels.profanity(long_one + "Sikke noget lort.") is None      # one mild word
+    assert labels.profanity(long_one + "Fuck.") is None                  # one word, however strong
     assert labels.profanity(long_one + "Lort og pisse.") is not None     # two mild
 
 
 def test_a_long_post_needs_density():
-    essay = "This is a long and careful essay about the weather and the sea. " * 30   # 390 words
-    assert labels.check(essay + "Damn. Fuck.") == []                    # score 3, 0.8 per 100 words
-    assert "profanity" in kinds(essay + "Fuck, fuck. Damn this. Fuck.")  # score 7
+    essay = "This is a long and careful essay about the weather and the sea. " * 50   # 650 words
+    assert labels.check(essay + "Damn. Crap.") == []                    # 2 points: 0.3 per 100 words
+    assert "profanity" in kinds(essay + "Fuck. Fuck.")                  # 4 points: 0.6 per 100 words

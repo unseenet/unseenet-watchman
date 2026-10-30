@@ -65,7 +65,7 @@ def _zones(rows: list[dict]) -> list[Zone]:
 
 def _label_rules(t: dict) -> labels.Rules:
     base = labels.Rules()
-    return labels.Rules(min_score=int(t.get("min_score", t.get("min_hits", base.min_score))),
+    return labels.Rules(min_hits=int(t.get("min_hits", base.min_hits)),
                         short_words=int(t.get("short_words", base.short_words)),
                         long_words=int(t.get("long_words", base.long_words)),
                         min_density=float(t.get("min_density", base.min_density)))

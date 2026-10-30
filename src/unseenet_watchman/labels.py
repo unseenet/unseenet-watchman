@@ -43,12 +43,15 @@ except the ordinary words of ``wordlists/harmless.txt`` (cockpit, Pissarro) and 
 words marked whole-word only. Languages that do not join words (French, Spanish,
 Italian) are left out of this: "disputa" is no compound of "puta".
 
+**A threshold**: one rude word in a longer post is no reason to warn anybody, however
+strong. A label needs ``min_hits`` words or phrases (2), or one in a short post of at
+most ``short_words`` words (a two-word insult is the whole post).
+
 **Weights and density** (#11). A word is strong (2) or mild (1); a list line ending in
 ``!`` is strong, ``~`` mild, and otherwise profanity is mild and sexual words strong.
-A label needs a score of ``min_score`` - two mild words or one strong one - or any hit
-in a short post of at most ``short_words`` words (a two-word insult is the whole post).
-A post longer than ``long_words`` also needs ``min_density`` points per 100 words: a
-few oaths in a long essay are no reason to warn anybody.
+A post longer than ``long_words`` (300) also needs ``min_density`` points per 100 words
+(0.5): two oaths in a long essay are no reason to warn anybody, but two of the
+strongest are.
 
 **The author first**: a label the author already gave the post as a tag (UN-RFC 0052)
 is not given again.
@@ -279,10 +282,10 @@ def compound_part(w: str, label: str, langs) -> tuple[str, int] | None:
 
 @dataclass
 class Rules:
-    min_score: int = 2         # two mild words, or one strong, for the label ...
-    short_words: int = 8       # ... or any, in a post of at most this many words
-    long_words: int = 150      # a longer post also needs ...
-    min_density: float = 1.0   # ... this score per 100 words
+    min_hits: int = 2          # words or phrases of one label in a post ...
+    short_words: int = 8       # ... or one, in a post of at most this many words
+    long_words: int = 300      # a longer post also needs ...
+    min_density: float = 0.5   # ... this many points (strong 2, mild 1) per 100 words
 
 
 @dataclass
@@ -300,10 +303,10 @@ class Verdict:
                 + (f", {self.lang} text" if self.lang else ""))
 
 
-def enough(score: int, n_words: int, rules: Rules) -> bool:
+def enough(n_hits: int, score: int, n_words: int, rules: Rules) -> bool:
     if n_words <= rules.short_words:
-        return score >= 1
-    if score < rules.min_score:
+        return n_hits >= 1
+    if n_hits < rules.min_hits:
         return False
     return n_words <= rules.long_words or score * 100 / n_words >= rules.min_density
 
@@ -344,7 +347,7 @@ def check(text: str, rules: Rules | None = None, author_tags=()) -> list[Verdict
             if part:
                 hits.append(f"{part[0]} (in {w})")
                 score += part[1]
-        if hits and enough(score, len(raw), rules):
+        if hits and enough(len(hits), score, len(raw), rules):
             out.append(Verdict(label, hits, lang, score))
     return out
 
