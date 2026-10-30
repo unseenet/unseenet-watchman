@@ -7,10 +7,13 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-30
+
+Needs unseenet 0.6.5 (`unseenet>=0.6.5,<0.7`), which makes the link cards; nodes need no update for it.
+
 ### Added
 
-- **Deceptive link cards** (#27, UN-RFC 0059 section 11; needs unseenet with `fetch_card`,
-  unseenet#797): with `cards = true`, the page behind a post's link card is read over Tor
+- **Deceptive link cards** (#27, UN-RFC 0059 section 11; needs unseenet 0.6.5): with `cards = true`, the page behind a post's link card is read over Tor
   and the post reported as phishing when the card's title has nothing in common with the
   page's title, description or site name. Never for short titles, pages without a title,
   or cookie walls and challenges; each link read once a day at most. Off by default.
@@ -102,5 +105,6 @@ nothing is ever removed from the network.
   through Tor. Each list has a test point checked every 6 hours; a list that
   fails it is paused. SURBL on by default, Spamhaus DBL with a DQS key, URIBL off.
 
-[Unreleased]: https://github.com/unseenet/unseenet-watchman/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/unseenet/unseenet-watchman/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/unseenet/unseenet-watchman/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/unseenet/unseenet-watchman/releases/tag/v0.1.0
