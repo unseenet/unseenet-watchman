@@ -136,3 +136,61 @@ def test_lingua_when_installed():
     pytest.importorskip("lingua")
     assert labels.lingua_language(labels.words("Tak for hjælpen, vi ses i morgen tidlig")) in ("da", "no", None)
     assert labels.lingua_language(labels.words("Thanks for the help, see you tomorrow morning")) == "en"
+
+
+# --- #11: mentioned, not used; written to slip past; weights and density
+
+@pytest.mark.parametrize("text", [
+    'Debatten handlede om, hvorvidt ordet kneppe burde stå i en ordbog, og om "kneppe" er talesprog',
+    'False friends ("slut", "fick", "fan", "skit" ...) are one file; "h0r" was found in one',
+    "Run `fuck` in the terminal, it fixes the command you typed: ```\nfuck\nfuck\n```",
+    "In German, das Wort Scheiße is as common as the word shit is in English, nothing more",
+    "Han skrev «faen» og «helvete» i diskusjonen om banning i norsk, og det var alt han sa",
+])
+def test_a_mentioned_word_does_not_count(text):
+    assert labels.check(text) == []
+
+
+def test_a_longer_quotation_is_reported_speech_and_counts():
+    assert "profanity" in kinds('Then he said "fuck you all, I am leaving now" and he left the room')
+
+
+@pytest.mark.parametrize("text,hit", [
+    ("Hvad fanden er det her for en f u c k i n g opdatering", "fucking"),
+    ("What is this sh1t, honestly, and why is all this crap here", "shit (sh1t)"),
+    ("That is just fuuuuck, and so much more of it", "fuck (fuuuuck)"),
+    ("This f*ck thing again, and who wrote it", "fuck (f*ck)"),
+    ("Sikke et lortesystem, og det er noget lort", "lorte (in lortesystem)"),
+    ("Das ist mir scheißegal, verdammt noch mal, sagte er", "scheiße (in scheißegal)"),
+])
+def test_written_to_slip_past(text, hit):
+    v = labels.profanity(text)
+    assert v is not None and hit in v.hits
+
+
+@pytest.mark.parametrize("text", [
+    "He landed in the cockpit and had a cocktail with Hitchcock, then looked at a Pissarro",
+    "Han er så russerliderlig og magtliderlig, og igen russerliderlig i dag",   # whole word only
+    "La disputa sobre la técnica y el arsenal continúa en el congreso hoy",   # no compounds
+    "Ich lese den dritten Teil und ein Drittel des vierten, sagte er gestern",
+    "En fandenivoldsk tur i helvedesild og satanisk musik",
+])
+def test_harmless_words_that_look_like_compounds(text):
+    assert labels.check(text) == []
+
+
+def test_weights_strong_and_mild():
+    assert labels.wordlist("profanity", "en").weight("fuck") == labels.STRONG
+    assert labels.wordlist("profanity", "en").weight("damn") == labels.MILD
+    assert labels.wordlist("sexual", "da").weight("kneppe") == labels.STRONG
+    assert labels.wordlist("sexual", "da").weight("porno") == labels.MILD
+    long_one = "Det er en lang tekst om vejret og om hvad vi skal i morgen tidlig. "
+    assert labels.profanity(long_one + "Fuck.") is not None              # one strong word
+    assert labels.profanity(long_one + "Sikke noget lort.") is None      # one mild word
+    assert labels.profanity(long_one + "Lort og pisse.") is not None     # two mild
+
+
+def test_a_long_post_needs_density():
+    essay = "This is a long and careful essay about the weather and the sea. " * 30   # 390 words
+    assert labels.check(essay + "Damn. Fuck.") == []                    # score 3, 0.8 per 100 words
+    assert "profanity" in kinds(essay + "Fuck, fuck. Damn this. Fuck.")  # score 7

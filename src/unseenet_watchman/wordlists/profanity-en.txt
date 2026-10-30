@@ -8,24 +8,24 @@ bollocks
 bullshit
 crap
 crappy
-cunt
-cunts
+cunt !
+cunts !
 dammit
 damn
 damnit
 dickhead
-fuck
-fucked
-fucker
-fuckers
-fuckin
-fucking
-fucks
+fuck !
+fucked !
+fucker !
+fuckers !
+fuckin !
+fucking !
+fucks !
 goddamn
 horseshit
-motherfucker
-motherfuckers
-motherfucking
+motherfucker !
+motherfuckers !
+motherfucking !
 omfg
 piss
 pissed
@@ -35,14 +35,14 @@ shithead
 shits
 shitty
 stfu
-twat
-wanker
-wankers
+twat !
+wanker !
+wankers !
 wtf
-mother fucker
+mother fucker !
 god damn
 piss off
 kiss my ass
 holy shit
-shut the fuck up
-what the fuck
+shut the fuck up !
+what the fuck !

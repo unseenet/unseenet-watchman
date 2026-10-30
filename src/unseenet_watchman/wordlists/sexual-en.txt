@@ -2,20 +2,20 @@
 # only. Written for unseenet-watchman (Apache-2.0); see SOURCE.md.
 blowjob
 blowjobs
-boobs
+boobs ~
 cock
 cocks
 cumshot
 dildo
 gangbang
 handjob
-horny
+horny ~
 jizz
 masturbate
 masturbating
 milf
-porn
-porno
+porn ~
+porno ~
 slut
 sluts
 tits

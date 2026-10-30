@@ -1,12 +1,12 @@
 # sexual - nl. One word or phrase per line, lower case; whole words and phrases
 # only. Written for unseenet-watchman (Apache-2.0); see SOURCE.md.
-geil
-geile
+geil ~
+geile ~
 geneukt
 kut
 lul
 neuken
 neukt
 pik
-porno
+porno ~
 tieten
