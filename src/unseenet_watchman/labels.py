@@ -238,7 +238,8 @@ def unmask(w: str) -> str | None:
     for c in cands:
         if c != w and _listed(c):
             return c
-    if "*" in w and len(w) >= 3 and sum(ch.isalpha() for ch in w) >= 2:
+    # masked inside only: "*is*" is markdown emphasis and "**at" bold, not a hidden word
+    if "*" in w[1:-1] and w[0].isalpha() and w[-1].isalpha() and sum(ch.isalpha() for ch in w) >= 2:
         pat = re.compile("^" + "".join("." if ch == "*" else re.escape(ch) for ch in w) + "$")
         hits = [x for x in _all_single() if pat.match(x)]
         if len(hits) == 1:
