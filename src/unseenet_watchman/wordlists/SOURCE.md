@@ -11,6 +11,7 @@ so these were written instead, in two kinds that match the core's warning labels
 | `profanity-<lang>.txt` | `profanity` | Swearing, oaths and vulgar words: *lort, for fanden, fuck, scheiße, merde, joder, cazzo* |
 | `sexual-<lang>.txt` | `sexual` | Sexual and obscene words: *kneppe, porno, knulla, ficken, salope, tette* |
 | `false-friends.txt` | - | Words that are rude in one language and ordinary in another: they count only in posts in the language of the list that names them |
+| `harmless.txt` | - | Ordinary words that begin or end with a listed word (cockpit, Pissarro, fandenivoldsk): never read as a rude compound |
 
 Languages: `da` `no` `sv` `de` `nl` `en` `fr` `es` `it`.
 
@@ -24,7 +25,15 @@ Languages: `da` `no` `sv` `de` `nl` `en` `fr` `es` `it`.
 - **Slurs**: there is no warning label for them; hate aimed at people is a report reason.
 
 **Format:** one word or phrase per line, lower case, `#` starts a comment. Only whole
-words and whole phrases match. Add inflected forms as their own lines.
+words and whole phrases match; add inflected forms as their own lines. A line may end
+with marks:
+
+- `!` a strong word (weight 2), `~` a mild one (weight 1). Unmarked, profanity is mild
+  and sexual words are strong. The weights count only in long posts, where a label
+  needs enough points per 100 words.
+- `=` whole words only: never read as part of a compound ("liderlig", which ends
+  "russerliderlig" and "magtliderlig" in Danish politics, and means nothing sexual
+  there).
 
 **Changing them:** a pull request with the word, the language and - for a false
 friend - the language where it is ordinary. Tried on 2400 Usenet posts in six groups
