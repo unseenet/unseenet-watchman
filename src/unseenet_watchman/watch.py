@@ -27,6 +27,7 @@ from unseenet.core.reports import MAX_ENTRIES
 
 from . import decide, dupes, labelling, uris
 from .labels import Rules as LabelRules
+from .model import ModelConfig
 from .dnsbl import Lookups, Zone
 from .state import State
 
@@ -63,6 +64,7 @@ class Config:
     labels: bool = False          # also a labeller (UN-RFC 0053): profanity
     label_rules: LabelRules = field(default_factory=LabelRules)
     ripen_to: int | None = None      # the issuers' level (#21); else UNSEENET_RIPEN_TO, else 3
+    model: ModelConfig | None = None  # [model]: a guard model, measured only for now (#11)
 
 
 # Key-bound groups that others write in: comments under a feed's posts (UN-RFC 0034)

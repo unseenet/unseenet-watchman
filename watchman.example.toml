@@ -43,6 +43,18 @@ labels = false
 min_hits = 2         # rude words or phrases in a post for the label ...
 short_words = 8      # ... or one, in a post of at most this many words
 
+# A guard model as the labels' second step (#11) - measured only, nothing is published
+# from it yet. Try a text with: unseenet-watchman -c watchman.toml model "text"
+# An OpenAI-compatible server (Ollama, llama.cpp) on a private address: posts never go
+# to an outside service. Qwen3Guard-Gen-0.6B needs about 0.8 GB and some seconds a post
+# on one core; give it one thread (Ollama: PARAMETER num_thread 1).
+#
+# [model]
+# url = "http://127.0.0.1:11434"
+# model = "qwen3guard-gen-0.6b"
+# timeout = 120
+# max_chars = 1500     # of the post's own text, around the doubtful words
+
 [rules]
 wave_keys = 5        # the same text from this many keys: spam
 flood_groups = 5     # the same text from one key in this many groups: flood

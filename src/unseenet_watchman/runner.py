@@ -6,6 +6,7 @@
     unseenet-watchman -c watchman.toml run               # keep watching (push)
     unseenet-watchman -c watchman.toml status            # what is queued and published
     unseenet-watchman -c watchman.toml unreport ID       # a post or key was no spam
+    unseenet-watchman -c watchman.toml model "text"      # what the guard model says ([model])
 
 Nothing is published unless ``publish = true`` in the config: until then every batch
 is a dry run, written to the log. ``--dry-run`` forces one; ``--publish`` is refused
@@ -28,7 +29,7 @@ from pathlib import Path
 from unseenet.client.session import Session, SessionError
 from unseenet.core.vault import Vault
 
-from . import __version__, decide, dupes, labelling, labels, uris
+from . import __version__, decide, dupes, labelling, labels, model, uris
 from .dnsbl import Zone
 from .state import State
 from .watch import (ISSUERS, Config, acting, look, make_lookups, publish,
@@ -63,6 +64,13 @@ def _zones(rows: list[dict]) -> list[Zone]:
             for r in rows]
 
 
+def _model(m: dict) -> model.ModelConfig:
+    base = model.ModelConfig()
+    return model.ModelConfig(url=m.get("url", base.url), model=m.get("model", base.model),
+                             timeout=float(m.get("timeout", base.timeout)),
+                             max_chars=int(m.get("max_chars", base.max_chars)))
+
+
 def load_config(path: str | Path) -> Config:
     d = tomllib.loads(Path(path).read_text())
     w, r = d.get("watchman", {}), d.get("rules", {})
@@ -86,7 +94,8 @@ def load_config(path: str | Path) -> Config:
             labels=bool(w.get("labels", False)),
             label_rules=labels.Rules(min_hits=int(d.get("labels", {}).get("min_hits", 2)),
                                      short_words=int(d.get("labels", {}).get("short_words", 8))),
-            ripen_to=int(w["ripen_to"]) if "ripen_to" in w else None)
+            ripen_to=int(w["ripen_to"]) if "ripen_to" in w else None,
+            model=_model(d["model"]) if "model" in d else None)
     except KeyError as exc:
         raise SystemExit(f"{path}: missing {exc}") from exc
 
@@ -257,6 +266,21 @@ def cmd_status(cfg: Config) -> None:
         print(f"  {','.join(e['labels']) or 'take back':9} {e['id']} {e['group'].partition('@')[0]}: {e['why']}")
 
 
+async def cmd_model(cfg: Config, text: str) -> None:
+    """What the word lists and the guard model say about one text - nothing published."""
+    if cfg.model is None or not cfg.model.model:
+        raise SystemExit("no [model] in the config (url and model)")
+    d = model.doubt(text, cfg.label_rules)
+    print("word lists: " + ("; ".join(v.why for v in d.verdicts) or "no label"))
+    print("in doubt: " + (", ".join(d.reasons) or "no") + (f" ({', '.join(d.focus)})" if d.focus else ""))
+    op = await model.ask(cfg.model, text, d.focus)
+    if op is None:
+        print("model: no opinion (no answer, or not in the guard format)")
+        return
+    print(f"model: {op.why} in {op.seconds} s; labels {', '.join(op.labels) or 'none'}"
+          + ("; tries to talk a model round" if op.jailbreak else ""))
+
+
 async def cmd_unreport(cfg: Config, target: str) -> None:
     st = State.load(cfg.state_file)
     s = open_session(cfg, log=lambda m: None) if cfg.publish else None
@@ -293,6 +317,9 @@ def main(argv: list[str] | None = None) -> None:
     u = sub.add_parser("unreport", help="a post (Message-ID) or key that was no spam, "
                                         "or a post labelled by mistake")
     u.add_argument("target")
+    m = sub.add_parser("model", help="what the word lists and the guard model say about "
+                                     "one text, or - for standard input ([model], #11)")
+    m.add_argument("text")
     a = p.parse_args(argv)
     cfg = load_config(a.config)
     if a.cmd == "init":
@@ -309,6 +336,8 @@ def main(argv: list[str] | None = None) -> None:
         cmd_status(cfg)
     elif a.cmd == "unreport":
         asyncio.run(cmd_unreport(cfg, a.target))
+    elif a.cmd == "model":
+        asyncio.run(cmd_model(cfg, sys.stdin.read() if a.text == "-" else a.text))
 
 
 if __name__ == "__main__":
