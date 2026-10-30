@@ -19,7 +19,7 @@ import random
 import statistics
 from collections import Counter
 
-from unseenet_watchman import labels, model
+from unseenet_watchman import dupes, labels, model
 
 
 def short(text: str, n: int = 110) -> str:
@@ -54,6 +54,7 @@ async def main() -> None:
     for p_ in posts:
         d = model.doubt(p_["text"], rules)
         p_["doubt"], p_["lists"] = d.reasons, sorted(v.label for v in d.verdicts)
+        p_["focus"] = d.focus
         (doubtful if d else calm).append(p_)
         reasons.update(d.reasons)
     random.seed(11)
@@ -65,21 +66,29 @@ async def main() -> None:
           f"{dict(reasons)}; asking about {len(todo)} (with {len(sample)} not in doubt)\n", flush=True)
 
     out = open(a.out, "w", encoding="utf-8") if a.out else None
+    seen: dict[str, model.Opinion | None] = {}     # one question a text, as in a wave
     for i, p_ in enumerate(todo, 1):
-        op = await model.ask(cfg, p_["text"])
+        fp = dupes.fingerprint(p_["text"])
+        if fp is not None and fp in seen:
+            op, p_["reused"] = seen[fp], True
+        else:
+            op = await model.ask(cfg, p_["text"], p_.get("focus", ()))
+            if fp is not None:
+                seen[fp] = op
         p_["model"] = None if op is None else {"safety": op.safety, "categories": list(op.categories),
                                                "labels": op.labels, "seconds": op.seconds}
         if out:
             out.write(json.dumps({k: v for k, v in p_.items()}, ensure_ascii=False) + "\n")
             out.flush()
         if i % 25 == 0:
-            secs = [q["model"]["seconds"] for q in todo[:i] if q.get("model")]
+            secs = [q["model"]["seconds"] for q in todo[:i] if q.get("model") and not q.get("reused")]
             print(f"  {i}/{len(todo)}, {statistics.mean(secs) if secs else 0:.1f} s a post", flush=True)
 
     asked = [q for q in todo if "model" in q]
     answered = [q for q in asked if q["model"]]
-    secs = sorted(q["model"]["seconds"] for q in answered)
-    print(f"\nanswers: {len(answered)} of {len(asked)} in the guard format")
+    secs = sorted(q["model"]["seconds"] for q in answered if not q.get("reused"))
+    print(f"\nanswers: {len(answered)} of {len(asked)} in the guard format; "
+          f"{len(secs)} model calls, the rest the same text again")
     if secs:
         print(f"seconds a post: mean {statistics.mean(secs):.1f}, median {statistics.median(secs):.1f}, "
               f"95 % {secs[int(len(secs) * 0.95) - 1 if len(secs) > 1 else 0]:.1f}, max {secs[-1]:.1f}")

@@ -28,6 +28,14 @@ def test_clean_drops_quotes_encoding_and_signature():
     assert len(model.clean("et ord " * 1000, 3000)) == 3000
 
 
+def test_excerpt_around_the_focus():
+    text = "vejret er fint i dag. " * 200 + "sikke et lortesystem. " + "og så videre. " * 200
+    ex = model.excerpt(text, ["lortesystem"], 600)
+    assert len(ex) == 600 and "lortesystem" in ex
+    assert model.excerpt("kort tekst", ["x"], 600) == "kort tekst"
+    assert model.excerpt(text, [], 600).startswith("vejret")
+
+
 def test_hidden_words():
     assert model.hidden("hvilket f u c k system") == ["f u c k"]
     assert model.hidden("hvilket f.u.c.k system") == ["f.u.c.k"]
@@ -42,7 +50,8 @@ def test_doubt_reasons():
     assert "labelled" in model.doubt("fuck fuck", rules).reasons
     long_one = "lort " + "det er nu en lang tekst om vejret og ikke andet end det. " * 3
     assert model.doubt(long_one, rules).reasons == ["one word"]
-    assert "hidden" in model.doubt("sikke et lortesystem i dag", rules).reasons
+    d = model.doubt("sikke et lortesystem i dag", rules)
+    assert "hidden" in d.reasons and d.focus == ["lortesystem"]
 
 
 class _Fake(BaseHTTPRequestHandler):

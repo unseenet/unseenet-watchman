@@ -55,7 +55,7 @@ class ModelConfig:
     url: str = "http://127.0.0.1:11434"   # an OpenAI-compatible server, on a private address
     model: str = ""                        # e.g. "qwen3guard-gen-0.6b"
     timeout: float = 120.0                 # seconds for one answer
-    max_chars: int = 3000                  # of the post's own text; the rest is not sent
+    max_chars: int = 1500                  # of the post's own text, around the doubtful words
 
 
 @dataclass(frozen=True)
@@ -92,7 +92,7 @@ def parse(raw: str) -> Opinion | None:
     return Opinion(m.group(1).lower(), tuple(c for c in cats if c != "None"))
 
 
-def clean(text: str, max_chars: int = 3000) -> str:
+def clean(text: str, max_chars: int = 1500) -> str:
     """The post's own text, as ``words`` reads it: no quoted lines (the author did not
     write them), no encoded data, no signature, and at most ``max_chars``."""
     keep = []
@@ -103,6 +103,19 @@ def clean(text: str, max_chars: int = 3000) -> str:
             keep.append(line.rstrip())
     out = re.sub(r"\n{3,}", "\n\n", "\n".join(keep)).strip()
     return out[:max_chars]
+
+
+def excerpt(text: str, focus=(), max_chars: int = 1500) -> str:
+    """At most ``max_chars`` of the post's own text, around the first of the ``focus``
+    words when the post is longer: the context of a word is what the model is asked
+    about, and a long post costs seconds a page on one core."""
+    full = clean(text, 10**6)
+    if len(full) <= max_chars:
+        return full
+    low = full.lower()
+    at = min((i for i in (low.find(w.lower()) for w in focus) if i >= 0), default=0)
+    start = max(0, min(at - max_chars // 3, len(full) - max_chars))
+    return full[start:start + max_chars]
 
 
 # --- which posts are in doubt -------------------------------------------------------
@@ -149,6 +162,7 @@ def hidden(text: str) -> list[str]:
 class Doubt:
     reasons: list[str] = field(default_factory=list)
     verdicts: list[labels.Verdict] = field(default_factory=list)   # the word lists' labels
+    focus: list[str] = field(default_factory=list)                 # the words in doubt
 
     def __bool__(self) -> bool:
         return bool(self.reasons)
@@ -166,8 +180,10 @@ def doubt(text: str, rules: labels.Rules | None = None, author_tags=()) -> Doubt
     loose = labels.check(text, labels.Rules(min_hits=1, short_words=0), author_tags)
     if {v.label for v in loose} - {v.label for v in d.verdicts}:
         d.reasons.append("one word")                 # just under the threshold
-    if hidden(text):
+    d.focus = [h for v in loose for h in v.hits]
+    if found := hidden(text):
         d.reasons.append("hidden")
+        d.focus += found
     if len(ws) >= 20 and detect(ws) is None:
         d.reasons.append("language")                 # the lists may not know it
     return d
@@ -182,12 +198,13 @@ def _post(url: str, body: dict, timeout: float) -> dict:
         return json.loads(r.read())
 
 
-async def ask(cfg: ModelConfig, text: str) -> Opinion | None:
+async def ask(cfg: ModelConfig, text: str, focus=()) -> Opinion | None:
     """The guard model's opinion of a post's own text, or None (no answer, or an
-    answer in another shape). The post goes in as the user's message alone: a guard
-    model's own template is the fixed instruction around it."""
+    answer in another shape). The post goes in as the user's message alone - a guard
+    model's own template is the fixed instruction around it - cut to ``max_chars``
+    around the ``focus`` words (``Doubt.focus``)."""
     body = {"model": cfg.model, "temperature": 0, "max_tokens": 32,
-            "messages": [{"role": "user", "content": clean(text, cfg.max_chars)}]}
+            "messages": [{"role": "user", "content": excerpt(text, focus, cfg.max_chars)}]}
     url = cfg.url.rstrip("/") + "/v1/chat/completions"
     t = time.monotonic()
     try:
