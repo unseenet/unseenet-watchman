@@ -25,7 +25,7 @@ from unseenet.client.session import Session, SessionError
 from unseenet.core.groups import KIND_REACTION, is_key_bound
 from unseenet.core.reports import MAX_ENTRIES
 
-from . import cards, decide, dupes, labelling, uris
+from . import cards, decide, dupes, labelling, shares, uris
 from .labels import Rules as LabelRules
 from .dnsbl import Lookups, Zone
 from .state import State
@@ -115,7 +115,8 @@ def own_keys(s: Session) -> set[str]:
 
 
 async def check_post(m, lookups: Lookups, st: State, cfg: Config, now: float) -> list[decide.Finding]:
-    """The findings for one post: its links, then whether it is part of a wave."""
+    """The findings for one post: its links, then whether it is part of a wave, then
+    what it completes as a share."""
     found: list[decide.Finding] = []
     for host in uris.hosts(m.body):
         if uris.allowed(host, cfg.rules.allow_domains):
@@ -136,6 +137,11 @@ async def check_post(m, lookups: Lookups, st: State, cfg: Config, now: float) ->
     if fp is not None:
         e = dupes.Entry(fp, m.message_id, m.group, m.author_key, now)
         found += decide.from_dupes(e, st.dupes.add(e), cfg.rules)
+    # a share: wide sharing and share-flooding (UN-RFC 0060 7.3); its comment, links
+    # and card were judged above as any post's. A plain share's body is only the
+    # original's address - too short for a fingerprint, so never a wave by itself
+    have = {f.message_id for f in found}
+    found += [f for f in shares.check(m, st.shares, cfg.rules, now) if f.message_id not in have]
     return found
 
 

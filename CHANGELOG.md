@@ -7,8 +7,15 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
+Needs unseenet 0.6.6 (`unseenet>=0.6.6,<0.7`), which shares.
+
 ### Added
 
+- **Shares** (#30, UN-RFC 0060 7.3): a share is judged as any post - its comment, links
+  and link card. One key sharing the same post into `share_groups` (5) groups, or 30
+  plain shares of different posts within an hour (`share_burst`, `share_burst_minutes`),
+  is reported as `flood`, every share of the run. Many people sharing one post is never
+  a finding, and a plain share - only the original's address - is never a wave.
 - **Labels: mentioned is not used** (#11): a word in a short quotation, in code or right
   after "ordet", "the word" and the like does not count - the 0.1.0 release note was
   labelled `sexual` for listing its own false friends.

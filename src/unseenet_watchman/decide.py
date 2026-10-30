@@ -33,6 +33,9 @@ class Rules:
     key_after: int = 3        # findings about one key before the key is reported
     key_window: int = 7       # ... within this many days
     key_days: int = 30        # how long a key report lasts
+    share_groups: int = 5     # one post shared by one key into this many groups: flood
+    share_burst: int = 30     # plain shares of different posts by one key ...
+    share_burst_minutes: int = 60   # ... within this many minutes: flood
     allow_keys: frozenset[str] = frozenset()      # never reported
     allow_domains: frozenset[str] = frozenset()   # never looked up
 

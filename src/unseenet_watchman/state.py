@@ -6,7 +6,8 @@
 - ``published``: each report article published, with what it named, so a mistake can
   be taken back (``unreport``) and the rest published again;
 - ``reported_posts`` / ``reported_keys``: what is reported now, so nothing is twice;
-- ``spared``: posts and keys a person said were no spam - never reported again.
+- ``spared``: posts and keys a person said were no spam - never reported again;
+- ``shares``: each key's recent shares, for wide sharing and share-flooding (0060).
 
 A first run sets ``fresh``: everything already in the groups is seen but not judged,
 as the help bot leaves earlier posts alone.
@@ -22,6 +23,7 @@ from pathlib import Path
 
 from .decide import Finding, KeyCounter
 from .dupes import Index
+from .shares import ShareCounter
 
 SEEN_DAYS = 14
 
@@ -43,6 +45,7 @@ class State:
         self.pending_labels: list[dict] = []           # {id, group, labels, why}
         self.labelled: dict[str, dict] = {}            # post -> {group, article}
         self.high: dict[str, int] = {}                 # group -> last article number read
+        self.shares = ShareCounter()                   # each key's recent shares (0060)
 
     @classmethod
     def load(cls, path: Path) -> "State":
@@ -64,6 +67,7 @@ class State:
         st.pending_labels = d.get("pending_labels", [])
         st.labelled = d.get("labelled", {})
         st.high = d.get("high", {})
+        st.shares = ShareCounter.from_json(d.get("shares", {}))
         return st
 
     def save(self) -> None:
@@ -72,13 +76,14 @@ class State:
         now = time.time()
         self.seen = {m: t for m, t in self.seen.items() if now - t <= SEEN_DAYS * 86400}
         self.dupes.prune(now)
+        self.shares.prune(now)
         d = {"fresh": self.fresh, "seen": self.seen, "dupes": self.dupes.to_json(),
              "pending": [asdict(f) for f in self.pending], "pending_keys": self.pending_keys,
              "published": self.published, "reported_posts": self.reported_posts,
              "reported_keys": self.reported_keys, "spared": sorted(self.spared),
              "key_hits": self.keys.hits, "last_batch": self.last_batch,
              "pending_labels": self.pending_labels, "labelled": self.labelled,
-             "high": self.high}
+             "high": self.high, "shares": self.shares.to_json()}
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(json.dumps(d))
