@@ -266,14 +266,15 @@ def cmd_status(cfg: Config) -> None:
         print(f"  {','.join(e['labels']) or 'take back':9} {e['id']} {e['group'].partition('@')[0]}: {e['why']}")
 
 
-async def cmd_model(cfg: Config, text: str) -> None:
+async def cmd_model(cfg: Config, text: str, subject: str = "", reply: bool = False) -> None:
     """What the word lists and the guard model say about one text - nothing published."""
     if cfg.model is None or not cfg.model.model:
         raise SystemExit("no [model] in the config (url and model)")
-    d = model.doubt(text, cfg.label_rules)
+    lists_text = text if reply or not subject else f"{subject}\n{text}"
+    d = model.doubt(lists_text, cfg.label_rules)
     print("word lists: " + ("; ".join(v.why for v in d.verdicts) or "no label"))
     print("in doubt: " + (", ".join(d.reasons) or "no") + (f" ({', '.join(d.focus)})" if d.focus else ""))
-    op = await model.ask(cfg.model, text, d.focus)
+    op = await model.ask(cfg.model, lists_text, d.focus, subject)
     if op is None:
         print("model: no opinion (no answer, or not in the guard format)")
         return
@@ -320,6 +321,8 @@ def main(argv: list[str] | None = None) -> None:
     m = sub.add_parser("model", help="what the word lists and the guard model say about "
                                      "one text, or - for standard input ([model], #11)")
     m.add_argument("text")
+    m.add_argument("--subject", default="", help="the post's subject; the model always sees it")
+    m.add_argument("--reply", action="store_true", help="a reply: the lists leave the subject alone")
     a = p.parse_args(argv)
     cfg = load_config(a.config)
     if a.cmd == "init":
@@ -337,7 +340,7 @@ def main(argv: list[str] | None = None) -> None:
     elif a.cmd == "unreport":
         asyncio.run(cmd_unreport(cfg, a.target))
     elif a.cmd == "model":
-        asyncio.run(cmd_model(cfg, sys.stdin.read() if a.text == "-" else a.text))
+        asyncio.run(cmd_model(cfg, sys.stdin.read() if a.text == "-" else a.text, a.subject, a.reply))
 
 
 if __name__ == "__main__":

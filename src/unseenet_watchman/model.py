@@ -198,13 +198,31 @@ def _post(url: str, body: dict, timeout: float) -> dict:
         return json.loads(r.read())
 
 
-async def ask(cfg: ModelConfig, text: str, focus=()) -> Opinion | None:
-    """The guard model's opinion of a post's own text, or None (no answer, or an
-    answer in another shape). The post goes in as the user's message alone - a guard
-    model's own template is the fixed instruction around it - cut to ``max_chars``
-    around the ``focus`` words (``Doubt.focus``)."""
+SUBJECT_MAX = 200
+
+
+def message(text: str, focus=(), max_chars: int = 1500, subject: str = "") -> str:
+    """What the model is shown: the subject first, always - also a reply's, which the
+    word lists leave alone (its author kept it, did not choose it), because it is the
+    context of what is said under it - then the post's own text around the doubtful
+    words. A subject that is already the text's first line is not shown twice."""
+    subject = " ".join((subject or "").split())[:SUBJECT_MAX]
+    if not subject:
+        return excerpt(text, focus, max_chars)
+    first, _, rest = (text or "").partition("\n")
+    if " ".join(first.split()) == subject:
+        text = rest
+    head = f"Subject: {subject}\n\n"
+    return head + excerpt(text, focus, max(200, max_chars - len(head)))
+
+
+async def ask(cfg: ModelConfig, text: str, focus=(), subject: str = "") -> Opinion | None:
+    """The guard model's opinion of a post, or None (no answer, or an answer in another
+    shape). The post goes in as the user's message alone - a guard model's own
+    template is the fixed instruction around it - as ``message`` makes it: the
+    subject, and the text cut to ``max_chars`` around the ``focus`` words."""
     body = {"model": cfg.model, "temperature": 0, "max_tokens": 32,
-            "messages": [{"role": "user", "content": excerpt(text, focus, cfg.max_chars)}]}
+            "messages": [{"role": "user", "content": message(text, focus, cfg.max_chars, subject)}]}
     url = cfg.url.rstrip("/") + "/v1/chat/completions"
     t = time.monotonic()
     try:

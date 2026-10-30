@@ -36,6 +36,17 @@ def test_excerpt_around_the_focus():
     assert model.excerpt(text, [], 600).startswith("vejret")
 
 
+def test_the_subject_always_goes_first():
+    m = model.message("min egen tekst", subject="Re: hvad betyder ordet?")
+    assert m == "Subject: Re: hvad betyder ordet?\n\nmin egen tekst"
+    # a new post's subject, which the lists read as the first line, is not shown twice
+    m = model.message("Lortesystem\nnoden hænger igen", subject="Lortesystem")
+    assert m == "Subject: Lortesystem\n\nnoden hænger igen"
+    assert model.message("tekst") == "tekst"
+    long_text = "ord og flere ord. " * 300
+    assert len(model.message(long_text, (), 600, "Emne")) <= 600
+
+
 def test_hidden_words():
     assert model.hidden("hvilket f u c k system") == ["f u c k"]
     assert model.hidden("hvilket f.u.c.k system") == ["f.u.c.k"]
@@ -80,6 +91,8 @@ async def test_ask_sends_only_the_post_and_parses():
         assert op.labels == ["sexual"]
         sent = _Fake.seen[-1]
         assert sent["messages"] == [{"role": "user", "content": "the post"}]
+        await model.ask(cfg, "the post", subject="Re: a subject")
+        assert _Fake.seen[-1]["messages"][0]["content"] == "Subject: Re: a subject\n\nthe post"
         _Fake.answer = "I think it is fine"
         assert await model.ask(cfg, "the post") is None
         cfg.url = "http://127.0.0.1:1"                       # nobody there

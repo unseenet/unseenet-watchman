@@ -42,8 +42,9 @@ async def main() -> None:
     for line in open(a.posts, encoding="utf-8"):
         d = json.loads(line)
         subject = "" if d.get("Subject", "").lower().startswith("re:") else d.get("Subject", "")
+        # the lists read a reply without its subject; the model always sees it
         posts.append({"id": d.get("Message-ID", ""), "group": d.get("group", ""),
-                      "text": f"{subject}\n{d.get('body', '')}"})
+                      "subject": d.get("Subject", ""), "text": f"{subject}\n{d.get('body', '')}"})
     if a.extra:
         chunks = open(a.extra, encoding="utf-8").read().split("\n%%\n")
         posts += [{"id": f"extra-{i}", "group": "extra", "text": t} for i, t in enumerate(chunks) if t.strip()]
@@ -68,11 +69,11 @@ async def main() -> None:
     out = open(a.out, "w", encoding="utf-8") if a.out else None
     seen: dict[str, model.Opinion | None] = {}     # one question a text, as in a wave
     for i, p_ in enumerate(todo, 1):
-        fp = dupes.fingerprint(p_["text"])
+        fp = dupes.fingerprint(p_.get("subject", "") + "\n" + p_["text"])
         if fp is not None and fp in seen:
             op, p_["reused"] = seen[fp], True
         else:
-            op = await model.ask(cfg, p_["text"], p_.get("focus", ()))
+            op = await model.ask(cfg, p_["text"], p_.get("focus", ()), p_.get("subject", ""))
             if fp is not None:
                 seen[fp] = op
         p_["model"] = None if op is None else {"safety": op.safety, "categories": list(op.categories),
