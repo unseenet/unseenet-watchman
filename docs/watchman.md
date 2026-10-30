@@ -10,8 +10,8 @@ In the graphical and the terminal client, spam reports are under the report
 issuers you follow. The watchman has two issuers, one per kind of finding:
 
 - **Unseenet watchman (spam)** - posts that look like spam: the same text
-  from many keys, the same text from one key in many groups, or links to
-  domains on spam blocklists;
+  from many keys, the same text from one key in many groups, links to
+  domains on spam blocklists, or shares that flood (below);
 - **Unseenet watchman (phishing)** - posts with links to phishing or malware.
 
 Follow either, both or neither. A post hidden by a report is shown as hidden,
@@ -21,6 +21,23 @@ contacts and your own are never hidden. Stop following at any time.
 A hierarchy's maintainer or a group's owner may name the watchman as a
 default for their groups (UN-RFC 0045 sections 7.1 and 7.5). You can still
 turn it off.
+
+## Shares
+
+A share ([UN-RFC 0060](https://unseenet.org/spec/un-rfc-0060/)) is judged as
+any post: the words of a share with a comment, its links and its link card.
+Two things only a share can do are counted, as Usenet's spam cancellers
+counted crossposts:
+
+- **sharing widely**: one key sharing the same post into five groups or more
+  (its feed and three others is as far as a client goes);
+- **share-flooding**: one key putting out 30 plain shares of different posts
+  within an hour.
+
+Either is reported as *flood*, every share of the run. Many people sharing the
+same post is never a finding - that is what sharing is for - and the watchman
+never counts how often a post is shared. A plain share is only the original's
+address, so it is never "the same text" as other people's shares of it.
 
 ## Reported by mistake?
 

@@ -53,6 +53,9 @@ min_density = 0.5    # ... this many points per 100 words (strong words 2, mild 
 [rules]
 wave_keys = 5        # the same text from this many keys: spam
 flood_groups = 5     # the same text from one key in this many groups: flood
+share_groups = 5     # one post shared by one key into this many groups: flood (UN-RFC 0060)
+share_burst = 30     # plain shares of different posts by one key ...
+share_burst_minutes = 60   # ... within this many minutes: flood
 key_after = 3        # findings about one key before the key itself is reported ...
 key_window = 7       # ... within this many days
 key_days = 30        # how long a key report lasts (at most 365)
