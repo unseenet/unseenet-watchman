@@ -2,8 +2,8 @@
 # only. Written for unseenet-watchman (Apache-2.0); see SOURCE.md.
 arsch
 arschloch
-fuck
-fucking
+fuck !
+fucking !
 kacke
 kacken
 pisse
@@ -21,6 +21,6 @@ verfluchte
 verdammte scheiße
 verdammt nochmal
 leck mich
-leck mich am arsch
-fick dich
+leck mich am arsch !
+fick dich !
 zum teufel

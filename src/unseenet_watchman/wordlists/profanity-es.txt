@@ -2,14 +2,14 @@
 # only. Written for unseenet-watchman (Apache-2.0); see SOURCE.md.
 carajo
 cojones
-coño
+coño !
 gilipollez
 joder
 jodida
 jodido
 mierda
-me cago en
-puta madre
+me cago en !
+puta madre !
 maldita sea
 qué coño
-vete a la mierda
+vete a la mierda !

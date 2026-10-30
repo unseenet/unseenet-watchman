@@ -10,3 +10,4 @@ bite    # English: to bite
 geil    # German: cool
 pis     # English: Raspberry Pis; French: tant pis
 bordel  # Danish, Norwegian, Czech: brothel, said plainly
+kuk     # Danish: crazy ("han er helt kuk")

@@ -1,7 +1,7 @@
 # profanity - nl. One word or phrase per line, lower case; whole words and phrases
 # only. Written for unseenet-watchman (Apache-2.0); see SOURCE.md.
-fuck
-fucking
+fuck !
+fucking !
 godverdomme
 godverdomse
 kak
@@ -11,4 +11,4 @@ shit
 sodemieter
 verdomd
 verdomme
-wat de fuck
+wat de fuck !

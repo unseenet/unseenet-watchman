@@ -5,10 +5,10 @@ knulla
 knullade
 knullar
 kuk
-kåt
-kåta
-porr
-porrfilm
+kåt ~
+kåta ~
+porr ~
+porrfilm ~
 runka
 runkar
 suga kuk

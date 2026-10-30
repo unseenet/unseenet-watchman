@@ -1,0 +1,29 @@
+# Ordinary words that begin or end with a word on a list, and so would be read as a
+# rude compound ("lortesystem"): never a hit. Found on Usenet posts and added as they
+# turn up; one word per line, lower case, with its inflections.
+arsenal
+arsenals
+arsenic
+cockburn
+cockerel
+cockerels
+cockpit
+cockpits
+cockroach
+cockroaches
+cocktail
+cocktails
+damnation
+damning
+fandenivoldsk
+fandenivoldske
+hancock
+helvedesild
+helvetesild
+hitchcock
+peacock
+peacocks
+pissarro
+shitake
+shuttlecock
+woodcock

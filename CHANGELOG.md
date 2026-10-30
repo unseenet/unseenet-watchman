@@ -7,6 +7,22 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Labels: mentioned is not used** (#11): a word in a short quotation, in code or right
+  after "ordet", "the word" and the like does not count - the 0.1.0 release note was
+  labelled `sexual` for listing its own false friends.
+- **Labels: words written to slip past** (#11): spelt apart, digits for letters, letters
+  said three times, masked letters, and compounds in the post's language family and
+  English ("lortesystem"), with `wordlists/harmless.txt` for ordinary look-alikes and a
+  `=` mark for whole-word-only entries.
+- **Labels: weights and density** (#11): strong (`!`) and mild (`~`) words; a post over
+  `long_words` (300) also needs `min_density` (0.5) points per 100 words. On the 2400
+  Usenet posts: profanity 15 → 87 (mostly one spam wave's compounds), sexual 87 → 92,
+  two long posts with two or three mild oaths no longer labelled.
+- **One look-up for all languages**: a check costs the same for nine languages as for
+  ninety (0.2 ms for an ordinary post).
+
 ## [0.2.0] - 2026-10-30
 
 Needs unseenet 0.6.5 (`unseenet>=0.6.5,<0.7`), which makes the link cards; nodes need no update for it.

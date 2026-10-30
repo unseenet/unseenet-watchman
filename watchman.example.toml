@@ -47,6 +47,8 @@ cards = false
 [labels]
 min_hits = 2         # rude words or phrases in a post for the label ...
 short_words = 8      # ... or one, in a post of at most this many words
+long_words = 300     # a longer post also needs ...
+min_density = 0.5    # ... this many points per 100 words (strong words 2, mild 1)
 
 [rules]
 wave_keys = 5        # the same text from this many keys: spam

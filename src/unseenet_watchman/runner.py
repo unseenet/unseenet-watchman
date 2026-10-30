@@ -63,6 +63,14 @@ def _zones(rows: list[dict]) -> list[Zone]:
             for r in rows]
 
 
+def _label_rules(t: dict) -> labels.Rules:
+    base = labels.Rules()
+    return labels.Rules(min_hits=int(t.get("min_hits", base.min_hits)),
+                        short_words=int(t.get("short_words", base.short_words)),
+                        long_words=int(t.get("long_words", base.long_words)),
+                        min_density=float(t.get("min_density", base.min_density)))
+
+
 def load_config(path: str | Path) -> Config:
     d = tomllib.loads(Path(path).read_text())
     w, r = d.get("watchman", {}), d.get("rules", {})
@@ -85,8 +93,7 @@ def load_config(path: str | Path) -> Config:
             zones=_zones(d["zone"]) if "zone" in d else None,
             labels=bool(w.get("labels", False)),
             cards=bool(w.get("cards", False)),
-            label_rules=labels.Rules(min_hits=int(d.get("labels", {}).get("min_hits", 2)),
-                                     short_words=int(d.get("labels", {}).get("short_words", 8))),
+            label_rules=_label_rules(d.get("labels", {})),
             ripen_to=int(w["ripen_to"]) if "ripen_to" in w else None)
     except KeyError as exc:
         raise SystemExit(f"{path}: missing {exc}") from exc

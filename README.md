@@ -56,8 +56,17 @@ whether to follow the labeller and what to do with a label (show, blur or hide).
   `unseenet-watchman[lingua]`, about 170 MB; 89 % right on Usenet posts against 78 %
   for the small words alone) - never from its language header: anybody can declare
   Danish and swear in English.
-- **Whole words and phrases only**, and a threshold: at least two in a post, or one in
-  a post of at most eight words. The subject counts too, but not in a reply.
+- **Mentioned is not used**: a word in a short quotation (`"kneppe"`), in code, or right
+  after "ordet", "the word", "das Wort" and the like is talked about, not said - a
+  debate about a word, or the watchman's own release notes.
+- **Written to slip past** is read as what it spells: "f u c k", "h0r", "fuuuck",
+  "f\*ck", and compounds in the post's language family and English ("lortesystem",
+  "scheißegal", "shitshow") - but not ordinary words that only look like one (cockpit,
+  Pissarro, "fandenivoldsk"; [`harmless.txt`](src/unseenet_watchman/wordlists/harmless.txt)).
+- **A threshold**: at least two words or phrases in a post, or one in a post of at most
+  eight words. A post over 300 words also needs 0.5 points per 100 words - strong words
+  (fuck, cunt) count 2, mild ones (damn, lort) 1 - so two mild oaths in a long essay are
+  no label. The subject counts too, but not in a reply.
 - **The author first**: a label the author already gave as a tag is not given again.
 - A label given by mistake is taken back with `unreport` (it publishes `[]` for that
   post) and the post is never labelled again.
