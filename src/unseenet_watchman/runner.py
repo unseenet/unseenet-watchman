@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import os
 import sys
 import time
@@ -35,8 +36,8 @@ from .watch import (ISSUERS, Config, acting, look, make_lookups, publish,
                     restore_high, start_issuers, unreport)
 
 PASS_ENV = "UNSEENET_VAULT_PASSPHRASE"
-ABOUT = """\
-# Unseenet watchman :robot:
+ISSUER_ABOUT = """\
+# Unseenet watchman ({kind}) :robot:
 
 I read the open groups of **[Unseenet](https://unseenet.org)** and publish
 **spam reports** ([UN-RFC 0045](https://unseenet.org/spec/un-rfc-0045/)) -
@@ -44,14 +45,48 @@ automatically, as a program.
 
 ## What I do - and don't
 
-- I report posts that look like spam or link to phishing and malware, and a
-  key only after repeated findings, for 30 days
+- {what}
 - I never remove anything: you, your node or a group's owner decide whether to
   follow my reports, and hidden posts are always one click from being shown
 - I only read open groups; closed groups and private posts are ciphertext to me
 - I am a program and can be wrong. If I reported you by mistake, write to my
   inbox and a person will look at it
 """
+ISSUER_WHAT = {
+    "spam": "I report posts that look like spam - the same text from many new keys, the "
+            "same text from one key in many groups, or links to domains on URI blocklists "
+            "for spam - and a key only after repeated findings, for 30 days",
+    "phishing": "I report posts with links to domains on URI blocklists for phishing and "
+                "malware, and a key only after repeated findings, for 30 days",
+}
+LABELLER_ABOUT = """\
+# Unseenet watchman (labels) :robot:
+
+I read the open groups of **[Unseenet](https://unseenet.org)** and publish
+**content labels** ([UN-RFC 0053](https://unseenet.org/spec/un-rfc-0053/)) -
+automatically, as a program.
+
+## What I do - and don't
+
+- I label posts with **profanity** (swearing, oaths) and **sexual** words, from my
+  own word lists in nine languages: whole words and phrases only, at least two in a
+  post or one in a very short post. Insults are not labelled
+- A label only **describes**: a client that follows me shows it as a warning you may
+  click past. I never report, hide or remove anything, and I never name keys
+- I only read open groups; closed groups and private posts are ciphertext to me
+- I am a program and can be wrong. If I labelled your post by mistake, write to my
+  inbox and a person will look at it
+"""
+
+
+def about_for(name: str) -> str:
+    """The profile text of one of the watchman's identities (watchman#25): each says
+    what it does - the labeller labels, the issuers report, each its own kind."""
+    if name == labelling.NAME:
+        return LABELLER_ABOUT
+    return ISSUER_ABOUT.format(kind=name, what=ISSUER_WHAT[name])
+
+
 PROFILE_LINKS = [{"kind": "github", "value": "https://github.com/unseenet/unseenet-watchman"}]
 
 
@@ -136,10 +171,12 @@ async def publish_profiles(s: Session, log=print) -> None:
     for name in [*ISSUERS, labelling.NAME]:
         if name not in s.data["identities"]:
             continue                                  # the labeller, when labels are off
-        flag = f"watchman_profile_{__version__.split('.dev')[0]}"
+        about = about_for(name)
+        # published again when its text changes (watchman#25), not only on a new version
+        flag = f"watchman_profile_{hashlib.sha256(about.encode()).hexdigest()[:12]}"
         if s.data["identities"][name].get(flag):
             continue
-        prof = make_profile(about=ABOUT, links=PROFILE_LINKS, lang=["en"], bot=True, markdown=True)
+        prof = make_profile(about=about, links=PROFILE_LINKS, lang=["en"], bot=True, markdown=True)
         try:
             with acting(s, name):
                 await s.publish_profile(prof)
