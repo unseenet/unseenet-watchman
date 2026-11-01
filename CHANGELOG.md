@@ -30,6 +30,12 @@ Needs unseenet 0.6.6 (`unseenet>=0.6.6,<0.7`), which shares.
 - **One look-up for all languages**: a check costs the same for nine languages as for
   ninety (0.2 ms for an ordinary post).
 
+### Fixed
+
+- **The image reads its passphrase secrets when the files belong to the host's user** (mode
+  600, as the compose file suggests): the start script copies them for the watchman's user
+  while it is still root. Before, the watchman found no passphrase (unseenet#862).
+
 ## [0.2.0] - 2026-10-30
 
 Needs unseenet 0.6.5 (`unseenet>=0.6.5,<0.7`), which makes the link cards; nodes need no update for it.
