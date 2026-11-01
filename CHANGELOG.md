@@ -32,6 +32,10 @@ Needs unseenet 0.6.6 (`unseenet>=0.6.6,<0.7`), which shares.
 
 ### Fixed
 
+- **Each identity's profile says what it does** (#25): the labeller's said it publishes spam
+  reports and reports keys - it labels, describes and never names keys. The two issuers'
+  profiles now say which kind they report. A profile is published again when its text
+  changes, not only with a new version.
 - **The image reads its passphrase secrets when the files belong to the host's user** (mode
   600, as the compose file suggests): the start script copies them for the watchman's user
   while it is still root. Before, the watchman found no passphrase (unseenet#862).
