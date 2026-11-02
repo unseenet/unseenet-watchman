@@ -1,0 +1,20 @@
+# Updates unseenet-watchman from its newest signed stable release (UN-RFC 0062 section 6.1,
+# unseenet/unseenet#827): only files whose hashes the release's server requirements
+# give, never to an older version, a random time of up to 48 hours after it first sees
+# the release; it copies the environment first and goes back if the service does not
+# come up. Root, since it restarts the service; pip runs as the owner of the environment.
+# Needs a core with --package (unseenet 0.8 or newer) in that environment.
+# It waits while the watchman ripens a key (the busy file), so a ripening is
+# never restarted. Install: copy both to /etc/systemd/system, then
+#   sudo systemctl enable --now unseenet-watchman-update.timer
+# What it did:  /home/watchman/venv/bin/unseenet-service-update status --service unseenet-watchman
+# Turn it off:  sudo /home/watchman/venv/bin/unseenet-service-update off --service unseenet-watchman
+# (it then only says, in the log, when a release has been out for 30 days).
+[Unit]
+Description=Update unseenet-watchman from its newest signed release
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/watchman/venv/bin/unseenet-service-update run --service unseenet-watchman --package unseenet-watchman --busy /home/watchman/.local/state/unseenet-watchman/busy

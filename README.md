@@ -124,7 +124,15 @@ unseenet-watchman -c watchman.toml status   # what is queued, published and spar
 unseenet-watchman -c watchman.toml unreport "<message-id>"   # it was no spam
 ```
 
-**Upgrading:** upgrade the core with it - pip does not upgrade a dependency
+**Updating by itself** (unseenet/unseenet#827): with a core that has it (0.8 or
+newer), `contrib/unseenet-watchman-update.service` and `.timer` update the
+watchman from its newest signed release - checked against the hashes the
+project key signed, never to an older version, and back to the version before
+if it does not come up. It waits while a key ripens, so a ripening is never
+restarted. Copy both to `/etc/systemd/system` and
+`systemctl enable --now unseenet-watchman-update.timer`.
+
+**Upgrading by hand:** upgrade the core with it - pip does not upgrade a dependency
 named by a git URL by itself:
 
 ```sh
