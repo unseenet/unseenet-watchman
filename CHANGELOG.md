@@ -7,6 +7,10 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-02
+
+Each identity's profile says what it does, on core 0.7. Needs unseenet 0.7 (`unseenet>=0.7,<0.8`): update the nodes first.
+
 ### Changed
 
 - Runs on core 0.7 (`unseenet>=0.7,<0.8`): announced nodes, councils and servers that update themselves.
@@ -142,6 +146,7 @@ nothing is ever removed from the network.
   through Tor. Each list has a test point checked every 6 hours; a list that
   fails it is paused. SURBL on by default, Spamhaus DBL with a DQS key, URIBL off.
 
-[Unreleased]: https://github.com/unseenet/unseenet-watchman/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/unseenet/unseenet-watchman/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/unseenet/unseenet-watchman/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/unseenet/unseenet-watchman/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/unseenet/unseenet-watchman/releases/tag/v0.1.0
