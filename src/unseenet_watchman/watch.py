@@ -72,6 +72,37 @@ class Config:
 READ_KEY_BOUND = ("feed",)
 
 
+COUNCIL_TTL = 3600.0             # how long a council's members are known before asking again
+_councils: dict[str, tuple[float, frozenset[str]]] = {}
+
+
+async def council_members(s: Session, gid: str, now: float) -> frozenset[str]:
+    """The current members of a council group (UN-RFC 0054), counted from their own
+    copies of its manifests; empty for any other group.
+
+    Their posts there are not judged: a council's members post the same text on purpose -
+    their copies of each manifest, the lists their replicas compute alike (UN-RFC 0020
+    section 8), the seconds of a proposal (UN-RFC 0061) - and five members would look
+    like a wave. They answer for what they post through the council, not through
+    reports. Anybody else posting in a council's open groups (claims, proposals,
+    announcements) is judged as anywhere."""
+    hit = _councils.get(gid)
+    if hit is not None and now - hit[0] < COUNCIL_TTL:
+        return hit[1]
+    members: frozenset[str] = frozenset()
+    data = s.manifest_data(gid) if hasattr(s, "manifest_data") else {}
+    if isinstance(data, dict) and "council" in data and hasattr(s, "council_chain"):
+        try:
+            cur = (await s.council_chain(gid)).current
+        except (SessionError, OSError, ConnectionError):
+            return hit[1] if hit is not None else members   # ask again next time
+        if cur is not None:
+            from unseenet.core.crypto import key_to_text
+            members = frozenset(key_to_text(k) for k in cur.keys)
+    _councils[gid] = (now, members)
+    return members
+
+
 def wanted(group_id: str, cfg: Config) -> bool:
     """An open group the config says to read: not key-bound (but feeds), matching
     ``groups`` and not ``skip_groups`` (patterns on the name, the part before @)."""
@@ -185,12 +216,13 @@ async def look_group(s: Session, gid: str, cfg: Config, st: State, lookups: Look
         log(f"{gid.partition('@')[0]}: {exc}")
         return 0, 0
     remember_high(s, st, gid)
+    council = await council_members(s, gid, now) if msgs else frozenset()
     checked = new = 0
     for m in msgs:
         if m.message_id in st.seen:
             continue
         st.seen[m.message_id] = now
-        if st.fresh or not _judge(m, mine, cfg):
+        if st.fresh or m.author_key in council or not _judge(m, mine, cfg):
             continue
         checked += 1
         new += queue_findings(await check_post(m, lookups, st, cfg, now), st, cfg, now, log)
