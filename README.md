@@ -229,6 +229,10 @@ a fetch over Tor.
   needlessly. A wave is reported as a whole, earlier posts too. This is also a
   first try at fingerprint reports
   ([unseenet#123](https://github.com/unseenet/unseenet/issues/123)).
+- **Councils.** In a council group (UN-RFC 0054) the posts of its current
+  members, counted from their own copies of its manifests and known for an
+  hour, are not judged: members post the same text on purpose (their manifest
+  copies, a list council's identical lists, seconds).
 - **Push, not walking the network.** Each node is asked to push every new
   article (`XUN-WATCH *`, UN-RFC 0008), and only the group it lands in is
   fetched, only what is new in it. A full sweep runs hourly to catch what a

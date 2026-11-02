@@ -7,6 +7,14 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **A council's members posting the same text is no wave.** In a council group (UN-RFC 0054)
+  the posts of its current members are not judged: their copies of each manifest, the lists a
+  list council's replicas post alike (UN-RFC 0020, unseenet/unseenet#56) and the seconds of a
+  proposal are the same text from several keys on purpose, and five members would have been
+  reported as spam. Anybody else in a council's open groups is judged as before.
+
 ## [0.3.0] - 2026-11-02
 
 Each identity's profile says what it does, on core 0.7. Needs unseenet 0.7 (`unseenet>=0.7,<0.8`): update the nodes first.

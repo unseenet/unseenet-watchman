@@ -39,6 +39,16 @@ same post is never a finding - that is what sharing is for - and the watchman
 never counts how often a post is shared. A plain share is only the original's
 address, so it is never "the same text" as other people's shares of it.
 
+## Councils
+
+A council's members post the same text on purpose: each member's copy of a
+council manifest ([UN-RFC 0054](https://unseenet.org/spec/un-rfc-0054/)),
+the lists a list council's replicas compute alike
+([UN-RFC 0020](https://unseenet.org/spec/un-rfc-0020/)), the seconds of a
+proposal. So in a council's groups the members' posts are not judged - they
+answer for them through the council. Anybody else posting in a council's open
+groups (claims, proposals, announcements) is judged as anywhere.
+
 ## Reported by mistake?
 
 Write to the issuer's inbox (its `contact`). A person looks at it, and a

@@ -206,3 +206,33 @@ def test_issuers_ripen_to_the_configured_level(tmp_path, monkeypatch):
     asyncio.run(runner.ripen_issuers(S(), c, log=lambda m: None))
     assert all(levels[n] == 2 for n in watch.ISSUERS)
     assert (next(iter(watch.ISSUERS)), 2) in published
+
+
+async def test_a_councils_members_posting_the_same_text_is_no_wave(tmp_path):
+    """A list council's replicas post identical lists (UN-RFC 0020 section 8): five
+    members are not five spammers. Anybody else in the council's groups is judged."""
+    from types import SimpleNamespace
+
+    from unseenet.core.crypto import Identity
+    members = [Identity.generate() for _ in range(5)]
+    LIST = ('{"nodes":[{"address":"onion:aaaa.onion","name":"one node of the network",'
+            '"node_key":"ed25519:x"}],"updated":"council 3 day 2026-11-01","v":1} '
+            "and some more words so that the fingerprint has enough of them to count")
+    s = FakeSession({"unseenet.nodes@c": [], "unseenet.lists.claims@c": []})
+    s.manifest_data = lambda gid: {"council": {"seq": 3}}
+    asked = []
+
+    async def council_chain(gid):
+        asked.append(gid)
+        return SimpleNamespace(current=SimpleNamespace(keys=[m.public_key for m in members]))
+    s.council_chain = council_chain
+    watch._councils.clear()
+    st, c = State(tmp_path / "s.json"), cfg(tmp_path)
+    await watch.look(s, c, st, lookups(), log=lambda m: None)            # first look
+    s.groups["unseenet.nodes@c"] = [msg(10 + i, "unseenet.nodes@c", m.key_text, LIST)
+                                    for i, m in enumerate(members)]
+    assert await watch.look(s, c, st, lookups(), log=lambda m: None) == 0
+    s.groups["unseenet.lists.claims@c"] = [msg(20 + i, "unseenet.lists.claims@c", f"ed25519:s{i}", LIST)
+                                           for i in range(5)]
+    assert await watch.look(s, c, st, lookups(), log=lambda m: None) == 5   # a wave
+    assert sorted(set(asked)) == ["unseenet.lists.claims@c", "unseenet.nodes@c"]
