@@ -7,6 +7,15 @@ All notable changes to unseenet-watchman are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **The watchman can update itself** (unseenet/unseenet#827, UN-RFC 0062 section 6.1): each
+  release carries its server requirements and `SHA256SUMS.txt`, and
+  `contrib/unseenet-watchman-update.service` and `.timer` update to the newest release the
+  project key signed (with a core that has `unseenet-service-update --package`, 0.8 or newer).
+  While a key ripens the watchman keeps a `busy` file beside its state, and the update waits:
+  a ripening is never restarted.
+
 ### Fixed
 
 - **A council's members posting the same text is no wave.** In a council group (UN-RFC 0054)

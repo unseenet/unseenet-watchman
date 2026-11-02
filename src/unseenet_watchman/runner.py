@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import hashlib
 import os
 import sys
@@ -201,6 +202,35 @@ def is_local(address: str) -> bool:
     return not address.split(":")[0].endswith(".onion")
 
 
+BUSY_EVERY = 600     # seconds: the updater takes a busy file older than 6 hours as left over
+
+
+@contextlib.asynccontextmanager
+async def busy(path: Path):
+    """While a key ripens, a file that tells the updater not to restart the watchman now
+    (unseenet-service-update --busy, unseenet/unseenet#827): a restart would start the
+    segment being proved over."""
+    async def keep() -> None:
+        while True:
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.touch()
+            except OSError:
+                pass
+            await asyncio.sleep(BUSY_EVERY)
+    task = asyncio.create_task(keep())
+    try:
+        yield
+    finally:
+        task.cancel()
+        with contextlib.suppress(OSError):
+            path.unlink()
+
+
+def busy_file(cfg: Config) -> Path:
+    return cfg.state_file.with_name("busy")
+
+
 async def ripen_issuers(s, cfg: Config, log) -> None:
     """Ripen the issuers' and the labeller's keys, one after the other, to ``ripen_to``,
     else ``UNSEENET_RIPEN_TO``, else 3 (#21, unseenet#740), publishing each new level.
@@ -210,18 +240,21 @@ async def ripen_issuers(s, cfg: Config, log) -> None:
     if not rp.available():
         return
     to = service_ripen_to(cfg.ripen_to)
-    for name in [*ISSUERS, labelling.NAME]:
-        if name not in s.data.get("identities", {}):
-            continue
-        try:
-            while (lv := s.ripening(name).level) is None or lv < to:
-                if not await s.ripen_segment(name):
-                    break
-                if s.ripening(name).level != s.published_level(name):
-                    await s.publish_ripening(name)
-                    log(f"{name}: key ripened to level {s.ripening(name).level}")
-        except Exception as exc:  # noqa: BLE001 - posting still ripens what it needs
-            log(f"ripening {name} stopped: {exc}")
+    names = [n for n in [*ISSUERS, labelling.NAME] if n in s.data.get("identities", {})
+             and ((lv := s.ripening(n).level) is None or lv < to)]
+    if not names:
+        return
+    async with busy(busy_file(cfg)):
+        for name in names:
+            try:
+                while (lv := s.ripening(name).level) is None or lv < to:
+                    if not await s.ripen_segment(name):
+                        break
+                    if s.ripening(name).level != s.published_level(name):
+                        await s.publish_ripening(name)
+                        log(f"{name}: key ripened to level {s.ripening(name).level}")
+            except Exception as exc:  # noqa: BLE001 - posting still ripens what it needs
+                log(f"ripening {name} stopped: {exc}")
 
 
 async def cmd_run(cfg: Config, once: bool, dry_run: bool) -> None:
